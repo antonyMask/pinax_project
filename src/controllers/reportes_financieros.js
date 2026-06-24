@@ -7,7 +7,7 @@ const obtenerReportesFinancieros = async (req, res) => {
     try {
 
 
-        // Extraemos los filtros enviados por query params......
+        // Extraemos los filltros enviados por query params......
         // Los query son los que permiten filtrar los resultados12
         const { 
             cod_reporte, 
