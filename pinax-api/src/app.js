@@ -11,6 +11,9 @@ const helmet = require('helmet');
 // Importamos las rutas del modulo personas
 const personasRoutes = require('./routes/personas.routes');
 
+// Importamos las rutas del modulo catalogo de cuentas
+const catalogoRoutes = require('./routes/catalogo.routes');
+
 // Creamos la aplicacion de Express.
 const app = express();
 
@@ -27,6 +30,10 @@ app.use(express.json());
 // Registramos las rutas del modulo pesonas.
 // Todas las rutas de personas comenzaran con /api/personas
 app.use('/api/personas', personasRoutes);
+
+// Registramos las rutas del modulo catalogo de cuentas.
+// Todas las rutas del catalogo comenzaran con /api/catalogo
+app.use('/api/catalogo', catalogoRoutes);
 
 // Ruta inicial de prueba
 // Sirve para comprobar que la API esta funcionando antes de crear rutas reales.
