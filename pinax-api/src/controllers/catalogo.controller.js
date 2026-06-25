@@ -150,8 +150,114 @@ await connection.query(
     }
 };
 
+/*
+    Controlador: actualizarCuenta
+    Funcion: Actualiza una cuenta contable usando el procedimiento: cc_upd_modulo_catalogo
+    Metodo HTTP: PUT
+    Ruta esperada: /api/catalogo/:id
+*/
+const actualizarCuenta = async (req, res) => {
+    let connection;
+
+    try {
+        // Extraemos el id de la cuenta de la URL (ej: /api/catalogo/5)
+        const { id } = req.params;
+
+        if (!id || isNaN(Number(id))) {
+            return res.status(400).json({
+                estado: 'error',
+                mensaje: 'El parámetro id de la cuenta debe ser numérico'
+            });
+        }
+
+        // Replicamos la captura de datos por si express.json() no está global
+        let bodyData = req.body;
+        if (!bodyData || Object.keys(bodyData).length === 0) {
+            const buffers = [];
+            for await (const chunk of req) {
+                buffers.push(chunk);
+            }
+            const rawString = Buffer.concat(buffers).toString();
+            bodyData = rawString ? JSON.parse(rawString) : {};
+        }
+
+        const {
+            cod_num_cuenta,
+            nom_cuenta,
+            cod_tipo_cuenta,
+            cod_cuenta_padre,
+            num_nivel_jerarquia,
+            ind_naturaleza_cuenta,
+            ind_acepta_movimiento,
+            des_cuenta,
+            ind_estado,
+            usr_modificacion,
+            actualizar_tipo,
+            nom_tipo_cuenta,
+            ind_naturaleza_tipo,
+            des_tipo_cuenta
+        } = bodyData;
+
+        // Validaciones de campos obligatorios requeridos por la estructura del procedimiento
+        if (!cod_num_cuenta || !nom_cuenta || !cod_tipo_cuenta || !num_nivel_jerarquia || !ind_naturaleza_cuenta || !ind_acepta_movimiento) {
+            return res.status(400).json({
+                estado: 'error',
+                mensaje: 'Faltan campos obligatorios para actualizar (cod_num_cuenta, nom_cuenta, cod_tipo_cuenta, num_nivel_jerarquia, ind_naturaleza_cuenta, ind_acepta_movimiento)'
+            });
+        }
+
+        connection = await pool.getConnection();
+
+        // Ejecutamos el procedimiento pasando los 15 parámetros requeridos
+        await connection.query(
+            'CALL cc_upd_modulo_catalogo(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+                Number(id),                                      // 1. p_cod_cuenta
+                cod_num_cuenta.trim(),                           // 2. p_cod_num_cuenta
+                nom_cuenta.trim(),                               // 3. p_nom_cuenta
+                Number(cod_tipo_cuenta),                         // 4. p_cod_tipo_cuenta
+                cod_cuenta_padre ? Number(cod_cuenta_padre) : null, // 5. p_cod_cuenta_padre
+                Number(num_nivel_jerarquia),                     // 6. p_num_nivel_jerarquia
+                ind_naturaleza_cuenta.toLowerCase().trim(),      // 7. p_ind_naturaleza_cuenta ('deudora' o 'acreedora')
+                ind_acepta_movimiento.toLowerCase().trim(),      // 8. p_ind_acepta_movimiento ('si' o 'no')
+                des_cuenta ? des_cuenta.trim() : null,           // 9. p_des_cuenta
+                ind_estado ? ind_estado.toLowerCase().trim() : 'activo', // 10. p_ind_estado (usar 'inactivo' para borrado lógico)
+                usr_modificacion ? usr_modificacion.trim() : 'sistema',  // 11. p_usr_modificacion
+                actualizar_tipo === true || actualizar_tipo === 'true' || actualizar_tipo === 1 ? 1 : 0, // 12. p_actualizar_tipo (BOOLEAN)
+                nom_tipo_cuenta ? nom_tipo_cuenta.trim() : null, // 13. p_nom_tipo_cuenta
+                ind_naturaleza_tipo ? ind_naturaleza_tipo.toLowerCase().trim() : null, // 14. p_ind_naturaleza_tipo
+                des_tipo_cuenta ? des_tipo_cuenta.trim() : null  // 15. p_des_tipo_cuenta
+            ]
+        );
+
+        return res.status(200).json({
+            estado: 'ok',
+            mensaje: 'Cuenta contable actualizada correctamente en el catálogo'
+        });
+
+    } catch (error) {
+        console.error('Error al actualizar cuenta contable:', error);
+
+        // Captura de los errores de validación lanzados desde el SIGNAL SQLSTATE '45000' en MySQL
+        if (error.sqlState === '45000') {
+            return res.status(400).json({
+                estado: 'error',
+                mensaje: error.sqlMessage || 'Error de validación en la base de datos'
+            });
+        }
+
+        return res.status(500).json({
+            estado: 'error',
+            mensaje: 'Error interno al actualizar la cuenta en el catálogo'
+        });
+    } finally {
+        if (connection) connection.release();
+    }
+};
+
 // Exportamos las funciones para las rutas
 module.exports = {
     obtenerCatalogo,
-    crearCuenta
+    crearCuenta,
+    actualizarCuenta
 };
