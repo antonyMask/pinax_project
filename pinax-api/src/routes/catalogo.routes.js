@@ -1,32 +1,38 @@
-// Importamos Express para crear las rutas del modulo catalogo.
 const express = require('express');
 
-// Creamos un enrutador propio para este modulo
-const router = express.Router();
-
-// Importamos el controlador que contiene la logica de consulta del catalogo.
+// Importamos el metodo GET del controlador de catalogo
 const {
     obtenerCatalogo,
-    crearCuenta
+    crearCuenta,
+    actualizarCuenta
 } = require('../controllers/catalogo.controller');
 
-/* Ruta: GET /api/catalogo
-   Funcion:
-   - Devuelve las cuentas contables registradas en el catalogo.
-   - Puede recibir filtros por query params (ej: id para una cuenta especifica).
-   
-   Ejemplos:
-   - /api/catalogo
-   - /api/catalogo?id=1
+const router = express.Router();
+
+/*
+    Ruta: GET /api/catalogo
+    Funcion:
+    - Consulta el catalogo de Cuentas.
+    - Permite filtrar por cod_tipo_cuenta.
 */
 router.get('/', obtenerCatalogo);
 
 /* Ruta: POST /api/catalogo
-    Funcion:
-    - Recibe los datos de una nueva cuenta contable en formato JSON.
-    - Llama al controlador crearCuenta.
+
+   Funcion:
+   - registra una nueva cuenta contable en el catalogo
 */
 router.post('/', crearCuenta);
 
-// Exportamos las rutas para registrarlas en app.js
+
+/* Ruta: PUT /api/catalogo/:cod_cuenta
+   Funcion:
+   - actualiza una cuenta contable existente
+   - permite soft delete cambiando ind_estado a inactivo
+*/
+
+router.put('/:cod_cuenta', actualizarCuenta)
+
+
+// Exportamos las rutas del modulo catalogo.
 module.exports = router;

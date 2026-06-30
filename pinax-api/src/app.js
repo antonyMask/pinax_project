@@ -14,6 +14,15 @@ const personasRoutes = require('./routes/personas.routes');
 // Importamos las rutas del modulo catalogo de cuentas
 const catalogoRoutes = require('./routes/catalogo.routes');
 
+// Importamos las rutas del modulo de cuentas T & Mayorizacion
+const mayorizacionRoutes = require('./routes/mayorizacion.routes');
+
+// Importamos las rutas del modulo de reportes
+const reportesRoutes = require('./routes/reportes.routes');
+
+// Importamos las rutas del modulo de asientos
+const asientosRoutes = require('./routes/asientos.routes');
+
 // Creamos la aplicacion de Express.
 const app = express();
 
@@ -34,6 +43,20 @@ app.use('/api/personas', personasRoutes);
 // Registramos las rutas del modulo catalogo de cuentas.
 // Todas las rutas del catalogo comenzaran con /api/catalogo
 app.use('/api/catalogo', catalogoRoutes);
+
+// Registramos las rutas del modulo de cuentas T & Mayorizacion
+// Todas las rutas de mayorizacion comenzaran con /api/mayorizacion
+app.use('/api/mayorizacion', mayorizacionRoutes);
+
+// Registramos las rutas del modulo de reportes
+// Todas las rutas de reportes comenzaran con /api/reportes
+app.use('/api/reportes', reportesRoutes);
+
+// Registramos las rutas del modulo de asientos
+// Todas las rutas de asientos comenzaran con /api/asientos
+app.use('/api/asientos', asientosRoutes);
+
+
 
 // Ruta inicial de prueba
 // Sirve para comprobar que la API esta funcionando antes de crear rutas reales.

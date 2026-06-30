@@ -1,190 +1,289 @@
-// Importamos el pool de conexiones configurado en src/config/db.js
-// Este pool nos permite ejecutar consultas en MySQL de forma controlada
+// Importamos el pool de conexiones configurado para MySQL.
 const { pool } = require('../config/db');
 
+/*
+    Constantes de validacion
+    Funcion:
+    - centralizan los valores permitidos para el modulo de reportes financieros.
+    - se usan en GET, POST y PUT.
+*/
+const TIPOS_REPORTE = ['balance_general', 'estado_resultados'];
+const ESTADOS_REPORTE = ['generado', 'confirmado', 'anulado'];
+
+/*  Funcion auxiliar: limpiarTexto
+    - valida si un valor existe.
+    - convierte el valor a texto.
+    - elimina espacios al inicio y al final.
+    - devuelve null si el texto queda vacio.
+*/
+const limpiarTexto = (valor) => {
+    if (valor === undefined || valor === null) return null;
+
+    const texto = String(valor).trim();
+    return texto.length > 0 ? texto : null;
+};
+
+/*  Funcion auxiliar: normalizarTexto
+    - limpia un texto.
+    - lo convierte a minusculas.
+    - ayuda a validar campos como tipo de reporte y estado.
+*/
+const normalizarTexto = (valor) => {
+    const texto = limpiarTexto(valor);
+    return texto ? texto.toLowerCase() : null;
+};
+
+/*  Funcion auxiliar: esEntero
+    - valida si un valor puede convertirse correctamente a numero entero.
+*/
+const esEntero = (valor) => {
+    return Number.isInteger(Number(valor));
+};
+
+/*  Funcion auxiliar: esEnteroPositivo
+    - valida si un valor es un numero entero mayor que cero.
+*/
+const esEnteroPositivo = (valor) => {
+    return esEntero(valor) && Number(valor) > 0;
+};
+
+/*  Funcion auxiliar: convertirBooleanoConsulta
+    - convierte un valor recibido por query params a booleano.
+    - acepta true, false, 1 y 0 como valores validos.
+*/
+const convertirBooleanoConsulta = (valor) => {
+    const texto = normalizarTexto(valor);
+
+    if (texto === null) return false;
+    if (texto === 'true' || texto === '1') return true;
+    if (texto === 'false' || texto === '0') return false;
+
+    return null;
+};
+
+/*  Funcion auxiliar: esNumero
+    - valida si un valor puede convertirse correctamente a numero.
+    - se usa para validar montos financieros.
+*/
+const esNumero = (valor) => {
+    return valor !== undefined &&
+           valor !== null &&
+           valor !== '' &&
+           Number.isFinite(Number(valor));
+};
+
+/*  Funcion auxiliar: convertirBooleanoBody
+    - convierte valores del body a booleano.
+    - acepta true, false, 1, 0, "true" y "false".
+*/
+const convertirBooleanoBody = (valor) => {
+    if (valor === undefined || valor === null) return true;
+
+    if (valor === true || valor === 1 || valor === '1') return true;
+    if (valor === false || valor === 0 || valor === '0') return false;
+
+    const texto = normalizarTexto(valor);
+
+    if (texto === 'true') return true;
+    if (texto === 'false') return false;
+
+    return null;
+};
+
+/*
+    Controlador: obtenerReportesFinancieros
+
+    Funcion:
+    - consulta reportes financieros.
+    - permite filtrar por cod_reporte.
+    - permite filtrar por cod_periodo.
+    - permite filtrar por tip_reporte.
+    - permite filtrar por ind_estado.
+    - permite filtrar por cod_user.
+    - permite incluir detalle cuando se consulta un reporte especifico.
+
+    Metodo HTTP:
+    - GET
+
+    Rutas esperadas:
+    - GET /api/reportes
+    - GET /api/reportes?cod_reporte=1
+    - GET /api/reportes?cod_periodo=1
+    - GET /api/reportes?tip_reporte=balance_general
+    - GET /api/reportes?tip_reporte=estado_resultados
+    - GET /api/reportes?ind_estado=generado
+    - GET /api/reportes?cod_reporte=1&incluir_detalle=true
+*/
 
 const obtenerReportesFinancieros = async (req, res) => {
     try {
-
-
-        // Extraemos los filtros enviados por query params
-        // Los query son los que permiten filtrar los resultados
-        const { 
-            cod_reporte, 
-            cod_periodo, 
-            tip_reporte, 
-            ind_estado, 
+        // Extraemos los filtros enviados por query params.
+        const {
+            cod_reporte,
+            cod_periodo,
+            tip_reporte,
+            ind_estado,
             cod_user,
-            incluir_detalle 
+            incluir_detalle
         } = req.query;
 
-        
-        // Validamos parametros 
-
-        // Validamos cod_reporte solo si viene en la URL
-        // Debe ser numérico porque es un BIGINT en la base de datos
-
-
-        if (cod_reporte && isNaN(Number(cod_reporte))) {
+        // Validamos cod_reporte si fue enviado.
+        if (cod_reporte && !esEnteroPositivo(cod_reporte)) {
             return res.status(400).json({
                 estado: 'error',
-                mensaje: 'El parametro cod_reporte debe ser numerico'
+                mensaje: 'El parametro cod_reporte debe ser numerico y positivo'
             });
         }
 
-        if (cod_periodo && isNaN(Number(cod_periodo))) {
+        // Validamos cod_periodo si fue enviado.
+        if (cod_periodo && !esEnteroPositivo(cod_periodo)) {
             return res.status(400).json({
                 estado: 'error',
-                mensaje: 'El parametro cod_periodo debe ser numerico'
+                mensaje: 'El parametro cod_periodo debe ser numerico y positivo'
             });
         }
 
-        if (cod_user && isNaN(Number(cod_user))) {
+        // Validamos cod_user si fue enviado.
+        if (cod_user && !esEnteroPositivo(cod_user)) {
             return res.status(400).json({
                 estado: 'error',
-                mensaje: 'El parametro cod_user debe ser numerico'
+                mensaje: 'El parametro cod_user debe ser numerico y positivo'
             });
         }
 
-        // Validamos tip_reporte solo si viene en la URL
-        // Solo permite dos tipos de reportes financieros estándar
-        if (tip_reporte && !['balance_general', 'estado_resultados'].includes(tip_reporte)) {
+        // Normalizamos el tipo de reporte.
+        const tipReporteParam = normalizarTexto(tip_reporte);
+
+        // Validamos tip_reporte si fue enviado.
+        if (tipReporteParam && !TIPOS_REPORTE.includes(tipReporteParam)) {
             return res.status(400).json({
                 estado: 'error',
                 mensaje: 'El parametro tip_reporte solo permite balance_general o estado_resultados'
             });
         }
 
-        // Validamos ind_estado solo si viene en la URL
-        // Los estados representan el ciclo de vida del reporte
-        if (ind_estado && !['generado', 'confirmado', 'anulado'].includes(ind_estado)) {
+        // Normalizamos el estado del reporte.
+        const indEstadoParam = normalizarTexto(ind_estado);
+
+        // Validamos ind_estado si fue enviado.
+        if (indEstadoParam && !ESTADOS_REPORTE.includes(indEstadoParam)) {
             return res.status(400).json({
                 estado: 'error',
                 mensaje: 'El parametro ind_estado solo permite generado, confirmado o anulado'
             });
         }
 
-        // Validamos incluir_detalle solo si viene en la URL
-        // Debe ser 'true' o 'false' para controlar si se incluye el detalle
-        if (incluir_detalle && !['true', 'false'].includes(incluir_detalle)) {
+        // Convertimos incluir_detalle a booleano.
+        const incluirDetalleParam = convertirBooleanoConsulta(incluir_detalle);
+
+        // Validamos incluir_detalle si fue enviado con un valor no permitido.
+        if (incluirDetalleParam === null) {
             return res.status(400).json({
                 estado: 'error',
-                mensaje: 'El parametro incluir_detalle solo permite true o false'
+                mensaje: 'El parametro incluir_detalle solo permite true, false, 1 o 0'
             });
         }
 
-        
-        // CONVERSIÓN Y LIMPIEZA DE PARÁMETROS
-    
-        // Convertimos los parámetros al tipo correcto que espera el SP
+        if (incluirDetalleParam && !cod_reporte) {
+            return res.status(400).json({
+                estado: 'error',
+                mensaje: 'Para incluir detalle debe enviar tambien el parametro cod_reporte'
+            });
+        }
 
+        // Convertimos los parametros.
         const codReporteParam = cod_reporte ? Number(cod_reporte) : null;
         const codPeriodoParam = cod_periodo ? Number(cod_periodo) : null;
         const codUserParam = cod_user ? Number(cod_user) : null;
-        const tipReporteParam = tip_reporte ? tip_reporte.trim() : null;
-        const indEstadoParam = ind_estado ? ind_estado.trim() : null;
-        
-        // Convertimos el string 'true' a booleano para el SP
-        // El SP espera un BOOLEAN para controlar si incluir el detalle
-        const incluirDetalleParam = incluir_detalle === 'true' ? true : false;
 
-        
-        // Ejecucion de los procedmientos almacenados
-        
-        // El procedimiento rf_sel_modulo_reportes está diseñado para:
-        // 1. Retornar la cabecera del reporte en el primer resultset
-        // 2. Retornar el detalle en el segundo resultset (si incluir_detalle=true)
-        // Para separar cabecera y detalle optimiza el rendimiento
-        // y permite al frontend decidir si necesita el detalle completo
+        /*
+            Ejecutamos el procedimiento almacenado.
 
+            Orden de parametros:
+            1. cod_reporte
+            2. cod_periodo
+            3. tip_reporte
+            4. ind_estado
+            5. cod_user
+            6. incluir_detalle
+        */
         const [resultado] = await pool.query(
             'CALL rf_sel_modulo_reportes(?, ?, ?, ?, ?, ?)',
             [
-                codReporteParam,      // Filtro por codigo de reporte
-                codPeriodoParam,      // Filtro por periodo contable
-                tipReporteParam,      // Filtro por tipo de reporte
-                indEstadoParam,       // Filtro por estado
-                codUserParam,         // Filtro por usuario
-                incluirDetalleParam   // Controla si incluir detalle
+                codReporteParam,
+                codPeriodoParam,
+                tipReporteParam,
+                indEstadoParam,
+                codUserParam,
+                incluirDetalleParam
             ]
         );
 
-        
-        // PROCESAMIENTO DE RESULTADOS
-        
-        // MySQL devuelve los resultados del CALL en un arreglo de arreglos
-        // resultado[0] = cabecera del reporte (siempre presente)
-        // resultado[1] = detalle del reporte (solo si incluir_detalle=true)
-        
+        /*
+            MySQL devuelve los resultados del CALL en arreglos.
+
+            resultado[0] contiene la cabecera de los reportes.
+            resultado[1] puede contener el detalle si incluir_detalle es true.
+        */
         const cabecera = resultado[0] || [];
-        
-        // Construimos la respuesta base con la cabecera
-        const responseData = {
-            cabecera: cabecera
-        };
+        const detalle = incluirDetalleParam ? (resultado[1] || []) : undefined;
 
-        // Si se solicito el detalle y existe, lo agregamos a la respuesta
-        if (incluirDetalleParam && resultado.length > 1) {
-            const detalle = resultado[1] || [];
-            responseData.detalle = detalle;
-        }
+        /*
+            Validacion de balance general.
 
-        
-        // Validamos el balance
-        
-        // El SP ya calcula el campo estado_validacion, pero hacemos
-        // una validacion adicional para reportes de balance general
-         
-        // La ecuacin contable (Activo = Pasivo + Patrimonio)
-        // es fundamental para la integridad financiera.
-        // Detectamos automaticamente si hay inconsistencias.
-
+            Si alguno de los reportes de tipo balance_general viene descuadrado,
+            marcamos balance_valido como false.
+        */
         let balanceValido = true;
-        let mensajeBalance = '';
+        let mensajeValidacion = 'Consulta realizada correctamente';
 
-        // Solo validamos si hay reportes y es de tipo balance_general
-        if (cabecera.length > 0 && cabecera[0].tip_reporte === 'balance_general') {
-            cabecera.forEach(reporte => {
-                // Verificamos si el balance esta cuadrado
-                // Si no lo esta, marcamos el reporte para alertar al usuario
-                if (reporte.estado_validacion === 'balance descuadrado') {
-                    balanceValido = false;
-                    mensajeBalance = `El reporte ${reporte.cod_reporte} tiene inconsistencias contables`;
-                }
-            });
+        const balancesDescuadrados = cabecera.filter((reporte) => {
+            return reporte.tip_reporte === 'balance_general' &&
+                   reporte.estado_validacion === 'balance descuadrado';
+        });
+
+        if (balancesDescuadrados.length > 0) {
+            balanceValido = false;
+            mensajeValidacion = 'Uno o mas balances generales presentan inconsistencias contables';
+        } else if (cabecera.some((reporte) => reporte.tip_reporte === 'balance_general')) {
+            mensajeValidacion = 'Todos los balances generales consultados estan cuadrados';
         }
 
-        
-        // Construimos la respuesta finial
-        
-        // Respondemos con una estructura clara y consistente
-
-        return res.status(200).json({
+        // Construimos la respuesta base.
+        const respuesta = {
             estado: 'ok',
             total_reportes: cabecera.length,
             incluye_detalle: incluirDetalleParam,
             balance_valido: balanceValido,
-            mensaje_validacion: mensajeBalance || 'Todos los balances están cuadrados',
-            ...responseData
-        });
+            mensaje_validacion: mensajeValidacion,
+            cabecera: cabecera
+        };
+
+        // Agregamos el detalle solo cuando fue solicitado.
+        if (incluirDetalleParam) {
+            respuesta.detalle = detalle;
+        }
+
+        return res.status(200).json(respuesta);
 
     } catch (error) {
-        
-        // MANEJO DE ERRORES
-        
-        // Mostramos informacion tecnica detallada en la terminal
-
-
         console.error('Error al obtener reportes financieros:', {
             codigo: error.code,
+            estadoSql: error.sqlState,
             numero: error.errno,
             mensaje: error.message,
-            sql: error.sql,
-            stack: error.stack
+            sql: error.sql
         });
 
-        // Respondemos con un mensaje generico al usuario
-        // por seguridad (no exponemos detalles internos)
+        // Capturamos errores controlados enviados desde MySQL.
+        if (error.sqlState === '45000') {
+            return res.status(400).json({
+                estado: 'error',
+                mensaje: error.sqlMessage || 'Error de validacion en la base de datos'
+            });
+        }
+
+        // Respondemos con un mensaje controlado para el cliente.
         return res.status(500).json({
             estado: 'error',
             mensaje: 'Error interno al consultar reportes financieros'
@@ -193,116 +292,114 @@ const obtenerReportesFinancieros = async (req, res) => {
 };
 
 /*
-    CONTROLADOR: crearReporteFinanciero
-    
-    
-    FUNCION:
-     Genera un nuevo reporte financiero usando el procedimiento:
-      rf_ins_modulo_reportes
-    
-    
-*/
+    Controlador: crearReporteFinanciero
 
+    Funcion:
+    - genera un nuevo reporte financiero.
+    - permite generar Balance General.
+    - permite generar Estado de Resultados.
+    - puede calcular automaticamente los totales desde la base de datos.
+    - tambien permite enviar totales manuales si calcular_automaticamente es false.
+
+    Metodo HTTP:
+    - POST
+
+    Ruta esperada:
+    - POST /api/reportes
+*/
 const crearReporteFinanciero = async (req, res) => {
     let connection;
 
     try {
-        
-        // EXTRACCION DE DATOS 
+        // Capturamos los datos enviados en el body de la peticion.
+        const bodyData = req.body || {};
 
-        // El usario envia los parametros en el cuerpo de la peticion
+        const codPeriodo = bodyData.cod_periodo;
+        const codUser = bodyData.cod_user;
+        const tipReporte = normalizarTexto(bodyData.tip_reporte);
 
-        const {
-            cod_periodo,
-            cod_user,
-            tip_reporte,
-            calcular_automaticamente,
-            tot_activo,
-            tot_pasivo,
-            tot_patrimonio,
-            mon_utilidad_perdida
-        } = req.body;
+        /*
+            calcular_automaticamente define si el procedimiento debe calcular
+            los totales desde los saldos contables o si se enviaran manualmente.
+        */
+        const calcularAutomaticamente = convertirBooleanoBody(bodyData.calcular_automaticamente);
 
-        // VALIDACION DE CAMPOS OBLIGATORIOS
+        const totActivo = bodyData.tot_activo;
+        const totPasivo = bodyData.tot_pasivo;
+        const totPatrimonio = bodyData.tot_patrimonio;
+        const monUtilidadPerdida = bodyData.mon_utilidad_perdida;
 
-        
-        if (!cod_periodo || !cod_user || !tip_reporte) {
+        // Validamos campos obligatorios.
+        if (
+            codPeriodo === undefined ||
+            codUser === undefined ||
+            !tipReporte
+        ) {
             return res.status(400).json({
                 estado: 'error',
                 mensaje: 'Los campos cod_periodo, cod_user y tip_reporte son obligatorios'
             });
         }
 
-        // VALIDACION DE TIPOS
-        // Aseguramos que los tipos de datos sean correctos
-        // antes de enviarlos a la base de datos
-
-        if (isNaN(Number(cod_periodo))) {
+        // Validamos que cod_periodo sea entero positivo.
+        if (!esEnteroPositivo(codPeriodo)) {
             return res.status(400).json({
                 estado: 'error',
-                mensaje: 'El campo cod_periodo debe ser numerico'
+                mensaje: 'El campo cod_periodo debe ser numerico y positivo'
             });
         }
 
-        if (isNaN(Number(cod_user))) {
+        // Validamos que cod_user sea entero positivo.
+        if (!esEnteroPositivo(codUser)) {
             return res.status(400).json({
                 estado: 'error',
-                mensaje: 'El campo cod_user debe ser numerico'
+                mensaje: 'El campo cod_user debe ser numerico y positivo'
             });
         }
 
-        // VALIDACION DE VALORES PERMITIDOS 
-        
-        // Los ENUMs en la base de datos son restrictivos
-        // Validamos aqui para dar mensajes claros al usuario
-
-        const tiposReporte = ['balance_general', 'estado_resultados'];
-        if (!tiposReporte.includes(tip_reporte)) {
+        // Validamos el tipo de reporte.
+        if (!TIPOS_REPORTE.includes(tipReporte)) {
             return res.status(400).json({
                 estado: 'error',
                 mensaje: 'El campo tip_reporte solo permite balance_general o estado_resultados'
             });
         }
 
-        // Validamos calcular_automaticamente si viene
-        // Debe ser un booleano (true o false)
-        if (calcular_automaticamente !== undefined && 
-            typeof calcular_automaticamente !== 'boolean') {
+        // Validamos calcular_automaticamente.
+        if (calcularAutomaticamente === null) {
             return res.status(400).json({
                 estado: 'error',
                 mensaje: 'El campo calcular_automaticamente debe ser booleano'
             });
         }
 
-        
-        // VALIDACION DE CAMPOS MANUALES
-
-        
-        if (calcular_automaticamente === false) {
-
-            // Validamos que los totales sean numericos
-            if (tot_activo !== undefined && isNaN(Number(tot_activo))) {
+        /*
+            Si calcular_automaticamente es false, permitimos que los totales
+            sean enviados manualmente, pero deben ser numericos si vienen.
+        */
+        if (calcularAutomaticamente === false) {
+            if (totActivo !== undefined && !esNumero(totActivo)) {
                 return res.status(400).json({
                     estado: 'error',
                     mensaje: 'El campo tot_activo debe ser numerico'
                 });
             }
 
-            if (tot_pasivo !== undefined && isNaN(Number(tot_pasivo))) {
+            if (totPasivo !== undefined && !esNumero(totPasivo)) {
                 return res.status(400).json({
                     estado: 'error',
                     mensaje: 'El campo tot_pasivo debe ser numerico'
                 });
             }
 
-            if (tot_patrimonio !== undefined && isNaN(Number(tot_patrimonio))) {
+            if (totPatrimonio !== undefined && !esNumero(totPatrimonio)) {
                 return res.status(400).json({
                     estado: 'error',
                     mensaje: 'El campo tot_patrimonio debe ser numerico'
                 });
             }
 
-            if (mon_utilidad_perdida !== undefined && isNaN(Number(mon_utilidad_perdida))) {
+            if (monUtilidadPerdida !== undefined && !esNumero(monUtilidadPerdida)) {
                 return res.status(400).json({
                     estado: 'error',
                     mensaje: 'El campo mon_utilidad_perdida debe ser numerico'
@@ -310,62 +407,94 @@ const crearReporteFinanciero = async (req, res) => {
             }
         }
 
-        
-        // OBTENCION DE CONEXION DEL POOL
+        /*
+            Convertimos los valores finales que se enviaran al procedimiento.
 
-        // Usamos una conexion dedicada porque el SP tiene parametros OUT
-        // y necesitamos consultarlos despues de la ejecucion
-        // 
-        // Por que los parametros OUT solo son accesibles en la misma
-        // conexion donde se ejecuto el SP
+            Si calcular_automaticamente es true, los totales se mandan como null
+            para que el procedimiento los calcule internamente.
+        */
+        const codPeriodoParam = Number(codPeriodo);
+        const codUserParam = Number(codUser);
+
+        const totActivoParam = calcularAutomaticamente ? null : (
+            totActivo !== undefined ? Number(totActivo) : null
+        );
+
+        const totPasivoParam = calcularAutomaticamente ? null : (
+            totPasivo !== undefined ? Number(totPasivo) : null
+        );
+
+        const totPatrimonioParam = calcularAutomaticamente ? null : (
+            totPatrimonio !== undefined ? Number(totPatrimonio) : null
+        );
+
+        const monUtilidadPerdidaParam = calcularAutomaticamente ? null : (
+            monUtilidadPerdida !== undefined ? Number(monUtilidadPerdida) : null
+        );
+
+        /*
+            Obtenemos una conexion individual.
+
+            Esto es necesario porque el procedimiento usa parametros OUT.
+            Las variables OUT deben leerse en la misma conexion donde se ejecuto el CALL.
+        */
         connection = await pool.getConnection();
 
-        // PREPARACION DE PARÁMETROS
+        /*
+            Validamos que el periodo contable exista.
 
-        // Convertimos valores y establecemos defaults
-        const codPeriodo = Number(cod_periodo);
-        const codUser = Number(cod_user);
-        const calcularAuto = calcular_automaticamente !== undefined ? 
-                             calcular_automaticamente : true; 
+            Esto nos permite dar un mensaje mas claro antes de ejecutar el procedimiento.
+        */
+        const [periodoExiste] = await connection.query(
+            'SELECT cod_periodo FROM ga_periodo_contable WHERE cod_periodo = ? LIMIT 1',
+            [codPeriodoParam]
+        );
 
-        const totActivo = calcularAuto ? null : (tot_activo ? Number(tot_activo) : null);
-        const totPasivo = calcularAuto ? null : (tot_pasivo ? Number(tot_pasivo) : null);
-        const totPatrimonio = calcularAuto ? null : (tot_patrimonio ? Number(tot_patrimonio) : null);
-        const utilidadPerdida = calcularAuto ? null : (mon_utilidad_perdida ? Number(mon_utilidad_perdida) : null);
+        if (periodoExiste.length === 0) {
+            return res.status(400).json({
+                estado: 'error',
+                mensaje: 'El periodo contable indicado no existe'
+            });
+        }
 
-        // EJECUCION DEL PROCEDIMIENTO ALMACENADO
+        /*
+            Ejecutamos el procedimiento almacenado real.
 
-        
-
+            Orden de parametros:
+            1. cod_periodo
+            2. cod_user
+            3. tip_reporte
+            4. calcular_automaticamente
+            5. tot_activo
+            6. tot_pasivo
+            7. tot_patrimonio
+            8. mon_utilidad_perdida
+            9. OUT cod_reporte_generado
+            10. OUT mensaje
+        */
         await connection.query(
             'CALL rf_ins_modulo_reportes(?, ?, ?, ?, ?, ?, ?, ?, @p_cod_reporte_generado, @p_mensaje)',
             [
-                codPeriodo,
-                codUser,
-                tip_reporte,
-                calcularAuto,
-                totActivo,
-                totPasivo,
-                totPatrimonio,
-                utilidadPerdida
+                codPeriodoParam,
+                codUserParam,
+                tipReporte,
+                calcularAutomaticamente,
+                totActivoParam,
+                totPasivoParam,
+                totPatrimonioParam,
+                monUtilidadPerdidaParam
             ]
         );
 
-
-        // RECUPERACION DE PARAMETROS OUT
-
-        // Los parametros OUT se recuperan con SELECT en la misma conexion
+        // Recuperamos los parametros OUT del procedimiento.
         const [resultadoOut] = await connection.query(
             'SELECT @p_cod_reporte_generado AS cod_reporte, @p_mensaje AS mensaje'
         );
 
-        const codReporteGenerado = resultadoOut[0].cod_reporte;
-        const mensajeSp = resultadoOut[0].mensaje;
+        const codReporteGenerado = resultadoOut[0]?.cod_reporte;
+        const mensajeSp = resultadoOut[0]?.mensaje;
 
-
-        // VALIDACION DE RESULTADO
-
-        // Verificamos que el SP haya generado un codigo válido
+        // Validamos que el procedimiento haya generado un codigo.
         if (!codReporteGenerado) {
             return res.status(400).json({
                 estado: 'error',
@@ -373,310 +502,412 @@ const crearReporteFinanciero = async (req, res) => {
             });
         }
 
-
-        // RESPUESTA EXITO
-
-        // Respondemos con código 201 (CREATED) y los datos generados
+        // Respondemos con el reporte generado.
         return res.status(201).json({
             estado: 'ok',
             mensaje: mensajeSp || 'Reporte financiero generado correctamente',
             cod_reporte: codReporteGenerado,
-            tipo: tip_reporte,
-            periodo: codPeriodo
+            tip_reporte: tipReporte,
+            cod_periodo: codPeriodoParam
         });
 
     } catch (error) {
-
-        // MANEJO DE ERRORES
-
+        // Mostramos el error tecnico en consola.
         console.error('Error al crear reporte financiero:', {
             codigo: error.code,
+            estadoSql: error.sqlState,
             numero: error.errno,
             mensaje: error.message,
             sql: error.sql
         });
 
-        // Si es un error conocido del SP, lo mostramos al cliente
-        // Los errores del SP tienen un mensaje especifico
-        if (error.message && error.message.includes('Error:')) {
+        // Capturamos errores controlados enviados desde MySQL.
+        if (error.sqlState === '45000') {
             return res.status(400).json({
                 estado: 'error',
-                mensaje: error.message
+                mensaje: error.sqlMessage || 'Error de validacion en la base de datos'
             });
         }
 
+        // Respuesta general para errores no controlados.
         return res.status(500).json({
             estado: 'error',
             mensaje: 'Error interno al generar reporte financiero'
         });
 
     } finally {
-
-        // LIBERACIÓN DE CONEXIÓN
-
-        // Importante: Siempre liberar la conexión al finalizar
-
-        if (connection) {
-            connection.release();
-        }
+        // Liberamos la conexion si fue tomada del pool.
+        if (connection) connection.release();
     }
 };
 
 /*
-    
-    CONTROLADOR: actualizarReporteFinanciero
-    
-    
-    FUNCION:
-    - Actualiza un reporte financiero usando el procedimiento:
-      rf_upd_modulo_reportes
-    
-   
+    Controlador: actualizarReporteFinanciero
+
+    Funcion:
+    - actualiza un reporte financiero existente.
+    - permite modificar el estado del reporte.
+    - permite actualizar totales financieros manualmente.
+    - permite aplicar soft delete cambiando ind_estado a "anulado".
+
+    Metodo HTTP:
+    - PUT
+
+    Ruta esperada:
+    - PUT /api/reportes/:cod_reporte
 */
-
 const actualizarReporteFinanciero = async (req, res) => {
+    let connection;
+
     try {
-
-        // EXTRACCION DE DATOS
-        
-        // cod_reporte viene en la URL (params)
-        // Los demas datos vienen en el body
+        // Extraemos el codigo del reporte desde la URL.
         const { cod_reporte } = req.params;
-        const {
-            ind_estado,
-            tot_activo,
-            tot_pasivo,
-            tot_patrimonio,
-            mon_utilidad_perdida
-        } = req.body;
 
+        // Capturamos los datos enviados en el body de la peticion.
+        const bodyData = req.body || {};
 
-        // VALIDACION DEL CODIGO DE REPORTE
-        // Es obligatorio y debe ser numérico
-        if (!cod_reporte || isNaN(Number(cod_reporte))) {
+        const indEstado = normalizarTexto(bodyData.ind_estado);
+        const totActivo = bodyData.tot_activo;
+        const totPasivo = bodyData.tot_pasivo;
+        const totPatrimonio = bodyData.tot_patrimonio;
+        const monUtilidadPerdida = bodyData.mon_utilidad_perdida;
+
+        // Validamos que cod_reporte sea numerico y positivo.
+        if (!esEnteroPositivo(cod_reporte)) {
             return res.status(400).json({
                 estado: 'error',
-                mensaje: 'El parametro cod_reporte debe ser numerico'
+                mensaje: 'El parametro cod_reporte debe ser numerico y positivo'
             });
         }
 
+        /*
+            Validamos que se envie al menos un campo para actualizar.
 
-        // VALIDACIÓN DE CAMPOS OBLIGATORIOS
-
-        // Al menos un campo debe ser enviado para actualizar
-        if (!ind_estado && tot_activo === undefined && 
-            tot_pasivo === undefined && tot_patrimonio === undefined &&
-            mon_utilidad_perdida === undefined) {
+            Para soft delete se envia:
+            {
+                "ind_estado": "anulado"
+            }
+        */
+        if (
+            !indEstado &&
+            totActivo === undefined &&
+            totPasivo === undefined &&
+            totPatrimonio === undefined &&
+            monUtilidadPerdida === undefined
+        ) {
             return res.status(400).json({
                 estado: 'error',
                 mensaje: 'Debe enviar al menos un campo para actualizar'
             });
         }
 
-
-        // VALIDACION DE VALORES PERMITIDOS
-
-        // Validamos el estado si viene
-        if (ind_estado && !['generado', 'confirmado', 'anulado'].includes(ind_estado)) {
+        // Validamos ind_estado si fue enviado.
+        if (indEstado && !ESTADOS_REPORTE.includes(indEstado)) {
             return res.status(400).json({
                 estado: 'error',
                 mensaje: 'El campo ind_estado solo permite generado, confirmado o anulado'
             });
         }
 
-
-        // VALIDACIÓN DE CAMPOS NUMERICOS
-        // Los totales deben ser numericos
-        if (tot_activo !== undefined && isNaN(Number(tot_activo))) {
+        // Validamos tot_activo si fue enviado.
+        if (totActivo !== undefined && !esNumero(totActivo)) {
             return res.status(400).json({
                 estado: 'error',
                 mensaje: 'El campo tot_activo debe ser numerico'
             });
         }
 
-        if (tot_pasivo !== undefined && isNaN(Number(tot_pasivo))) {
+        // Validamos tot_pasivo si fue enviado.
+        if (totPasivo !== undefined && !esNumero(totPasivo)) {
             return res.status(400).json({
                 estado: 'error',
                 mensaje: 'El campo tot_pasivo debe ser numerico'
             });
         }
 
-        if (tot_patrimonio !== undefined && isNaN(Number(tot_patrimonio))) {
+        // Validamos tot_patrimonio si fue enviado.
+        if (totPatrimonio !== undefined && !esNumero(totPatrimonio)) {
             return res.status(400).json({
                 estado: 'error',
                 mensaje: 'El campo tot_patrimonio debe ser numerico'
             });
         }
 
-        if (mon_utilidad_perdida !== undefined && isNaN(Number(mon_utilidad_perdida))) {
+        // Validamos mon_utilidad_perdida si fue enviado.
+        if (monUtilidadPerdida !== undefined && !esNumero(monUtilidadPerdida)) {
             return res.status(400).json({
                 estado: 'error',
                 mensaje: 'El campo mon_utilidad_perdida debe ser numerico'
             });
         }
 
-
-        // CONVERSION DE PARAQMETROS
-
+        // Convertimos el codigo del reporte.
         const codReporte = Number(cod_reporte);
-        const estado = ind_estado ? ind_estado : null;
-        const activo = tot_activo !== undefined ? Number(tot_activo) : null;
-        const pasivo = tot_pasivo !== undefined ? Number(tot_pasivo) : null;
-        const patrimonio = tot_patrimonio !== undefined ? Number(tot_patrimonio) : null;
-        const utilidadPerdida = mon_utilidad_perdida !== undefined ? Number(mon_utilidad_perdida) : null;
 
+        /*
+            Convertimos los montos.
 
-        // VERIFICACION DE EXISTENCIA DEL REPORTE
+            Si un monto no viene en el body, se envia null.
+            El procedimiento decide como manejar los campos nulos.
+        */
+        const totActivoParam = totActivo !== undefined ? Number(totActivo) : null;
+        const totPasivoParam = totPasivo !== undefined ? Number(totPasivo) : null;
+        const totPatrimonioParam = totPatrimonio !== undefined ? Number(totPatrimonio) : null;
+        const monUtilidadPerdidaParam = monUtilidadPerdida !== undefined
+            ? Number(monUtilidadPerdida)
+            : null;
 
-        // Antes de actualizar, verificamos que el reporte exista
-        // Usamos el SP de consulta para obtener el estado actual
-        const [resultadoExistencia] = await pool.query(
-            'CALL rf_sel_modulo_reportes(?, ?, ?, ?, ?, ?)',
-            [codReporte, null, null, null, null, false]
+        /*
+            Obtenemos una conexion individual.
+
+            Esto es necesario porque el procedimiento usa un parametro OUT.
+            El SELECT de @p_mensaje debe ejecutarse en la misma conexion.
+        */
+        connection = await pool.getConnection();
+
+        // Validamos que el reporte exista antes de actualizar.
+        const [reporteActual] = await connection.query(
+            `
+            SELECT 
+                cod_reporte,
+                tip_reporte,
+                ind_estado
+            FROM rf_reporte_financiero
+            WHERE cod_reporte = ?
+            LIMIT 1
+            `,
+            [codReporte]
         );
 
-        const reporteExistente = resultadoExistencia[0] || [];
-
-        // Si no existe, retornamos error 404 (Not Found)
-        if (reporteExistente.length === 0) {
+        if (reporteActual.length === 0) {
             return res.status(404).json({
                 estado: 'error',
                 mensaje: 'No existe un reporte financiero con ese codigo'
             });
         }
 
-        // Verificamos si el reporte esta anulado
-        // El SP de actualizacion también valida esto, pero lo hacemos
-        // aqui para dar un mensaje mas claro al usuario
-        const reporte = reporteExistente[0];
-        if (reporte.ind_estado === 'anulado') {
+        /*
+            Validamos que no se modifique un reporte ya anulado.
+            En este modulo, "anulado" funciona como soft delete.
+        */
+        if (reporteActual[0].ind_estado === 'anulado') {
             return res.status(400).json({
                 estado: 'error',
-                mensaje: 'No se puede actualizar un reporte que ya está anulado'
+                mensaje: 'No se puede actualizar un reporte que ya esta anulado'
             });
         }
 
+        /*
+            Ejecutamos el procedimiento almacenado.
 
-        // EJECUCION DE LA ACTUALIZACION
-
-        // El SP rf_upd_modulo_reportes tiene:
-        // - 5 parámetros de entrada (IN)
-        // - 1 parámetro de salida (OUT)
-        await pool.query(
-            'CALL rf_upd_modulo_reportes(?, ?, ?, ?, ?, @p_mensaje)',
+            Orden de parametros:
+            1. cod_reporte
+            2. ind_estado
+            3. tot_activo
+            4. tot_pasivo
+            5. tot_patrimonio
+            6. mon_utilidad_perdida
+            7. OUT mensaje
+        */
+        await connection.query(
+            'CALL rf_upd_modulo_reportes(?, ?, ?, ?, ?, ?, @p_mensaje)',
             [
                 codReporte,
-                estado,
-                activo,
-                pasivo,
-                patrimonio,
-                utilidadPerdida
+                indEstado,
+                totActivoParam,
+                totPasivoParam,
+                totPatrimonioParam,
+                monUtilidadPerdidaParam
             ]
         );
 
-
-        // MENSAJE DE SALIDA
-        const [resultadoMensaje] = await pool.query(
+        // Recuperamos el mensaje OUT del procedimiento.
+        const [resultadoMensaje] = await connection.query(
             'SELECT @p_mensaje AS mensaje'
         );
 
-        const mensaje = resultadoMensaje[0].mensaje;
+        const mensajeSp = resultadoMensaje[0]?.mensaje;
 
+        // Consultamos el reporte actualizado para devolver datos confirmados.
+        const [reporteActualizado] = await connection.query(
+            `
+            SELECT 
+                cod_reporte,
+                cod_periodo,
+                cod_user,
+                tip_reporte,
+                tot_activo,
+                tot_pasivo,
+                tot_patrimonio,
+                mon_utilidad_perdida,
+                ind_estado,
+                fec_generacion
+            FROM rf_reporte_financiero
+            WHERE cod_reporte = ?
+            LIMIT 1
+            `,
+            [codReporte]
+        );
 
-        // RESPUESTA EXITO
+        // Respondemos confirmando la actualizacion o anulacion logica.
         return res.status(200).json({
             estado: 'ok',
-            mensaje: mensaje || 'Reporte financiero actualizado correctamente',
-            cod_reporte: codReporte,
-            estado_anterior: reporte.ind_estado,
-            estado_actual: estado || reporte.ind_estado
+            mensaje: indEstado === 'anulado'
+                ? 'Reporte financiero anulado correctamente como soft delete logico'
+                : mensajeSp || 'Reporte financiero actualizado correctamente',
+            estado_anterior: reporteActual[0].ind_estado,
+            datos: reporteActualizado[0]
         });
 
     } catch (error) {
-
-        // MANEJO DE ERRORES
-
+        // Mostramos el error tecnico en consola.
         console.error('Error al actualizar reporte financiero:', {
             codigo: error.code,
+            estadoSql: error.sqlState,
             numero: error.errno,
             mensaje: error.message,
             sql: error.sql
         });
 
-        // Si es un error del SP, mostramos el mensaje al usuario
-        if (error.message && error.message.includes('Error:')) {
+        // Capturamos errores controlados enviados desde MySQL.
+        if (error.sqlState === '45000') {
             return res.status(400).json({
                 estado: 'error',
-                mensaje: error.message
+                mensaje: error.sqlMessage || 'Error de validacion en la base de datos'
             });
         }
 
+        // Respuesta general para errores no controlados.
         return res.status(500).json({
             estado: 'error',
             mensaje: 'Error interno al actualizar reporte financiero'
         });
+
+    } finally {
+        // Liberamos la conexion si fue tomada del pool.
+        if (connection) connection.release();
     }
 };
 
 /*
-    
-    CONTROLADOR: obtenerDetalleReporte
+    Controlador: obtenerDetalleReporte
 
-    
-    FUNCION:
-    - Obtiene solo el detalle de un reporte específico
-    - Es un helper para obtener el detalle sin la cabecera
-    
+    Funcion:
+    - obtiene solamente el detalle de un reporte financiero especifico.
+    - consulta la cabecera para validar que el reporte exista.
+    - devuelve las lineas del detalle financiero.
+    - usa el procedimiento rf_sel_modulo_reportes con incluir_detalle = true.
+
+    Metodo HTTP:
+    - GET
+
+    Ruta esperada:
+    - GET /api/reportes/:cod_reporte/detalle
 */
+
 
 const obtenerDetalleReporte = async (req, res) => {
     try {
+        // Extraemos el codigo del reporte desde la URL.
         const { cod_reporte } = req.params;
 
-        // Validamos el codigo de reporte
-        if (!cod_reporte || isNaN(Number(cod_reporte))) {
+        // Validamos que cod_reporte sea numerico y positivo.
+        if (!esEnteroPositivo(cod_reporte)) {
             return res.status(400).json({
                 estado: 'error',
-                mensaje: 'El parametro cod_reporte debe ser numerico'
+                mensaje: 'El parametro cod_reporte debe ser numerico y positivo'
             });
         }
 
+        // Convertimos el codigo del reporte a numero.
         const codReporte = Number(cod_reporte);
 
+        /*
+            Ejecutamos el procedimiento almacenado.
 
-        // LLAMADA AL SP CON incluir_detalle = true
-        
-        // Solo obtenemos el detalle, no necesitamos la cabecera
-        // pero el SP siempre retorna la cabecera primero
+            Orden de parametros:
+            1. cod_reporte
+            2. cod_periodo
+            3. tip_reporte
+            4. ind_estado
+            5. cod_user
+            6. incluir_detalle
+
+            En este caso:
+            - enviamos cod_reporte para buscar un reporte especifico.
+            - enviamos incluir_detalle = true para obtener las lineas del detalle.
+        */
         const [resultado] = await pool.query(
             'CALL rf_sel_modulo_reportes(?, ?, ?, ?, ?, ?)',
-            [codReporte, null, null, null, null, true]
+            [
+                codReporte,
+                null,
+                null,
+                null,
+                null,
+                true
+            ]
         );
 
-        // El detalle esta en el segundo resultset (indice 1)
+        /*
+            MySQL devuelve varios resultsets.
+
+            resultado[0] = cabecera del reporte.
+            resultado[1] = detalle del reporte.
+        */
+        const cabecera = resultado[0] || [];
         const detalle = resultado[1] || [];
 
+        // Validamos que el reporte exista.
+        if (cabecera.length === 0) {
+            return res.status(404).json({
+                estado: 'error',
+                mensaje: 'No existe un reporte financiero con ese codigo'
+            });
+        }
+
+        /*
+            Validamos que exista detalle.
+
+            Puede ocurrir que la cabecera exista, pero el detalle no tenga lineas.
+            En ese caso se devuelve 404 para indicar que no hay detalle disponible.
+        */
         if (detalle.length === 0) {
             return res.status(404).json({
                 estado: 'error',
-                mensaje: 'No se encontró detalle para el reporte especificado'
+                mensaje: 'No se encontro detalle para el reporte especificado'
             });
         }
 
+        // Respondemos solamente con el detalle y una cabecera resumida.
         return res.status(200).json({
             estado: 'ok',
-            total_lineas: detalle.length,
             cod_reporte: codReporte,
+            tip_reporte: cabecera[0].tip_reporte,
+            ind_estado: cabecera[0].ind_estado,
+            total_lineas: detalle.length,
             detalle: detalle
         });
 
     } catch (error) {
+        // Mostramos el error tecnico en consola.
         console.error('Error al obtener detalle del reporte:', {
             codigo: error.code,
+            estadoSql: error.sqlState,
             numero: error.errno,
-            mensaje: error.message
+            mensaje: error.message,
+            sql: error.sql
         });
 
+        // Capturamos errores controlados enviados desde MySQL.
+        if (error.sqlState === '45000') {
+            return res.status(400).json({
+                estado: 'error',
+                mensaje: error.sqlMessage || 'Error de validacion en la base de datos'
+            });
+        }
+
+        // Respuesta general para errores no controlados.
         return res.status(500).json({
             estado: 'error',
             mensaje: 'Error interno al obtener detalle del reporte'
@@ -684,14 +915,11 @@ const obtenerDetalleReporte = async (req, res) => {
     }
 };
 
-// EXPORTACION DE CONTROLADORES
 
-// Exportamos todas las funciones para usarlas en las rutas
-// Cada función corresponde a un endpoint específico
-
+// Exportamos los metodos del controlador de reportes financieros.
 module.exports = {
-    obtenerReportesFinancieros,    // GET /api/reportes
-    crearReporteFinanciero,        // POST /api/reportes
-    actualizarReporteFinanciero,   // PUT /api/reportes/:cod_reporte
-    obtenerDetalleReporte          // GET /api/reportes/:cod_reporte/detalle
+    obtenerReportesFinancieros,
+    crearReporteFinanciero,
+    actualizarReporteFinanciero,
+    obtenerDetalleReporte
 };
