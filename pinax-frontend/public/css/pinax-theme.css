@@ -1,0 +1,578 @@
+/*
+|--------------------------------------------------------------------------
+| Identidad visual de Pinax
+|--------------------------------------------------------------------------
+| Este archivo personaliza AdminLTE sin modificar los archivos del paquete.
+| Así una actualización mediante Composer no elimina nuestros estilos.
+*/
+
+:root {
+    --pinax-black: #01010b;
+    --pinax-navy: #171a57;
+    --pinax-blue: #1a99f7;
+    --pinax-cyan: #55dcff;
+    --pinax-magenta: #b024cb;
+    --pinax-violet: #6948e8;
+    --pinax-white: #f1f3f4;
+    --pinax-muted: #a2a8b1;
+    --pinax-surface: #ffffff;
+    --pinax-background: #f3f5fb;
+    --pinax-border: #e6e9f2;
+    --pinax-shadow: 0 14px 35px rgba(20, 28, 72, 0.08);
+}
+
+body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    color: #20243a;
+}
+
+/* Fondo general del contenido. */
+.pinax-content-wrapper,
+.content-wrapper {
+    background: var(--pinax-background);
+}
+
+/* Barra superior inspirada en el fondo del logo. */
+.pinax-topnav {
+    background:
+        linear-gradient(90deg, #050617 0%, #11143b 55%, #10104a 100%) !important;
+    border-bottom: 1px solid rgba(85, 220, 255, 0.18);
+}
+
+/* Sidebar global de Pinax. */
+.pinax-sidebar,
+.pinax-sidebar::before {
+    background:
+        linear-gradient(180deg, #050617 0%, #0b0d29 58%, #111348 100%) !important;
+}
+
+.pinax-brand {
+    background: rgba(1, 1, 11, 0.65);
+    border-bottom: 1px solid rgba(85, 220, 255, 0.16) !important;
+}
+
+.pinax-brand .brand-text {
+    font-family: Bahnschrift, "Segoe UI", sans-serif;
+    letter-spacing: 0.14em;
+}
+
+.pinax-brand .brand-image {
+    width: 34px;
+    height: 34px;
+    object-fit: cover;
+    border-radius: 9px;
+}
+
+.nav-sidebar .nav-link {
+    margin: 3px 8px;
+    border-radius: 9px;
+    transition:
+        background-color 180ms ease,
+        transform 180ms ease;
+}
+
+.nav-sidebar .nav-link:hover {
+    transform: translateX(2px);
+}
+
+.sidebar-dark-primary .nav-sidebar > .nav-item > .nav-link.active {
+    color: #fff;
+    background:
+        linear-gradient(90deg, var(--pinax-violet), var(--pinax-blue));
+    box-shadow: 0 8px 20px rgba(26, 153, 247, 0.22);
+}
+
+/* Encabezado distintivo del dashboard. */
+.pinax-hero {
+    position: relative;
+    display: flex;
+    min-height: 310px;
+    margin-bottom: 24px;
+    padding: 42px 48px;
+    overflow: hidden;
+    color: var(--pinax-white);
+    background:
+        radial-gradient(circle at 82% 25%, rgba(26, 153, 247, 0.24), transparent 31%),
+        radial-gradient(circle at 60% 100%, rgba(176, 36, 203, 0.2), transparent 36%),
+        linear-gradient(125deg, #030410 0%, #0a0c27 48%, #14164b 100%);
+    border: 1px solid rgba(85, 220, 255, 0.14);
+    border-radius: 22px;
+    box-shadow: 0 24px 55px rgba(5, 7, 30, 0.2);
+}
+
+.pinax-hero::after {
+    position: absolute;
+    right: -90px;
+    bottom: -120px;
+    width: 390px;
+    height: 250px;
+    content: "";
+    border: 1px solid rgba(85, 220, 255, 0.22);
+    border-radius: 50%;
+    transform: rotate(-18deg);
+}
+
+.pinax-hero-content {
+    position: relative;
+    z-index: 2;
+    max-width: 670px;
+}
+
+.pinax-kicker,
+.pinax-panel-kicker {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--pinax-cyan);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.17em;
+    text-transform: uppercase;
+}
+
+.pinax-hero h1 {
+    max-width: 650px;
+    margin: 0 0 15px;
+    font-family: Bahnschrift, "Segoe UI", sans-serif;
+    font-size: clamp(2.1rem, 4vw, 3.65rem);
+    font-weight: 700;
+    line-height: 1.02;
+    letter-spacing: -0.035em;
+}
+
+.pinax-hero h1 span {
+    color: transparent;
+    background:
+        linear-gradient(90deg, var(--pinax-cyan), #8ea5ff, #ec56ff);
+    background-clip: text;
+    -webkit-background-clip: text;
+}
+
+.pinax-hero p {
+    max-width: 590px;
+    margin-bottom: 24px;
+    color: #c4c9dc;
+    font-size: 1rem;
+    line-height: 1.7;
+}
+
+.pinax-hero-status {
+    display: inline-flex;
+    align-items: center;
+    padding: 9px 14px;
+    color: #dce1f1;
+    font-size: 0.82rem;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.11);
+    border-radius: 999px;
+    backdrop-filter: blur(8px);
+}
+
+.pinax-status-dot {
+    width: 8px;
+    height: 8px;
+    margin-right: 8px;
+    background: #43e8a2;
+    border-radius: 50%;
+    box-shadow: 0 0 10px #43e8a2;
+}
+
+.pinax-status-warning {
+    background: #ffc857;
+    box-shadow: 0 0 10px #ffc857;
+}
+
+.pinax-status-divider {
+    width: 1px;
+    height: 15px;
+    margin: 0 10px;
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.pinax-hero-logo {
+    position: absolute;
+    top: 50%;
+    right: 38px;
+    z-index: 1;
+    width: 250px;
+    opacity: 0.68;
+    transform: translateY(-50%);
+}
+
+.pinax-hero-logo img {
+    display: block;
+    width: 100%;
+    border-radius: 20px;
+    mix-blend-mode: screen;
+}
+
+/* Métricas. */
+.pinax-metrics > div {
+    margin-bottom: 24px;
+}
+
+.pinax-metric-card {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 135px;
+    padding: 23px;
+    overflow: hidden;
+    background: var(--pinax-surface);
+    border: 1px solid var(--pinax-border);
+    border-radius: 17px;
+    box-shadow: var(--pinax-shadow);
+    transition:
+        transform 180ms ease,
+        box-shadow 180ms ease;
+}
+
+.pinax-metric-card::before {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    height: 3px;
+    content: "";
+    background:
+        linear-gradient(90deg, var(--pinax-magenta), var(--pinax-blue), var(--pinax-cyan));
+}
+
+.pinax-metric-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 19px 42px rgba(20, 28, 72, 0.13);
+}
+
+.pinax-metric-icon {
+    display: grid;
+    flex: 0 0 54px;
+    width: 54px;
+    height: 54px;
+    margin-right: 17px;
+    color: #fff;
+    font-size: 1.35rem;
+    border-radius: 15px;
+    place-items: center;
+}
+
+.pinax-icon-blue {
+    background: linear-gradient(135deg, #176fd6, var(--pinax-blue));
+}
+
+.pinax-icon-cyan {
+    background: linear-gradient(135deg, #057d9d, #2bc6e9);
+}
+
+.pinax-icon-magenta {
+    background: linear-gradient(135deg, #83119a, var(--pinax-magenta));
+}
+
+.pinax-icon-violet {
+    background: linear-gradient(135deg, #4f38c7, var(--pinax-violet));
+}
+
+.pinax-metric-label {
+    display: block;
+    color: #757b91;
+    font-size: 0.79rem;
+    font-weight: 600;
+}
+
+.pinax-metric-card strong {
+    display: block;
+    margin: 2px 0;
+    color: #171b35;
+    font-family: Bahnschrift, "Segoe UI", sans-serif;
+    font-size: 1.85rem;
+    line-height: 1.15;
+}
+
+.pinax-metric-card small {
+    color: #9196a8;
+}
+
+/* Paneles inferiores. */
+.pinax-panel {
+    margin-bottom: 24px;
+    padding: 24px;
+    background: var(--pinax-surface);
+    border: 1px solid var(--pinax-border);
+    border-radius: 17px;
+    box-shadow: var(--pinax-shadow);
+}
+
+.pinax-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+}
+
+.pinax-panel-header h2 {
+    margin: 0;
+    color: #171b35;
+    font-size: 1.14rem;
+    font-weight: 700;
+}
+
+.pinax-panel-header > i {
+    color: var(--pinax-blue);
+    font-size: 1.25rem;
+}
+
+.pinax-table {
+    margin-bottom: 0;
+}
+
+.pinax-table thead th {
+    color: #7d8397;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border-top: 0;
+    border-bottom: 1px solid var(--pinax-border);
+}
+
+.pinax-table td {
+    vertical-align: middle;
+    border-color: #edf0f6;
+}
+
+.pinax-empty-state {
+    padding: 42px !important;
+    color: #9a9fb0;
+    text-align: center;
+}
+
+.pinax-empty-state i,
+.pinax-empty-state strong,
+.pinax-empty-state span {
+    display: block;
+}
+
+.pinax-empty-state i {
+    margin-bottom: 9px;
+    color: var(--pinax-blue);
+    font-size: 1.8rem;
+}
+
+.pinax-health-value {
+    color: #171b35;
+    font-family: Bahnschrift, "Segoe UI", sans-serif;
+    font-size: 2.8rem;
+    font-weight: 700;
+}
+
+.pinax-progress {
+    height: 8px;
+    margin: 12px 0 15px;
+    overflow: hidden;
+    background: #e9edf5;
+    border-radius: 999px;
+}
+
+.pinax-progress-value {
+    width: var(--pinax-progress);
+    height: 100%;
+    background:
+        linear-gradient(90deg, var(--pinax-violet), var(--pinax-blue), var(--pinax-cyan));
+    border-radius: inherit;
+}
+
+.pinax-health-panel p {
+    margin-bottom: 0;
+    color: #777d90;
+}
+
+.pinax-action-link {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 10px;
+    padding: 13px 14px;
+    color: #30364f;
+    background: #f7f8fc;
+    border: 1px solid #eceef5;
+    border-radius: 11px;
+    transition:
+        color 180ms ease,
+        border-color 180ms ease,
+        transform 180ms ease;
+}
+
+.pinax-action-link:hover {
+    color: var(--pinax-blue);
+    text-decoration: none;
+    border-color: rgba(26, 153, 247, 0.4);
+    transform: translateX(3px);
+}
+
+.pinax-action-link span i {
+    width: 24px;
+    color: var(--pinax-violet);
+}
+
+.pinax-alert {
+    border: 0;
+    border-radius: 14px;
+}
+
+/* Adaptación para tabletas y teléfonos. */
+@media (max-width: 991.98px) {
+    .pinax-hero {
+        padding: 36px 30px;
+    }
+
+    .pinax-hero-logo {
+        right: -45px;
+        width: 220px;
+        opacity: 0.2;
+    }
+}
+
+@media (max-width: 575.98px) {
+    .pinax-hero {
+        min-height: auto;
+        padding: 30px 23px;
+        border-radius: 16px;
+    }
+
+    .pinax-hero h1 {
+        font-size: 2rem;
+    }
+
+    .pinax-hero-status {
+        align-items: flex-start;
+        flex-direction: column;
+        border-radius: 13px;
+    }
+
+    .pinax-status-divider {
+        display: none;
+    }
+
+    .pinax-status-dot {
+        position: absolute;
+        margin-top: 5px;
+    }
+
+    .pinax-hero-status {
+        padding-left: 29px;
+    }
+}
+
+/* Respeta a usuarios que desactivan animaciones del sistema. */
+@media (prefers-reduced-motion: reduce) {
+    .pinax-metric-card,
+    .pinax-action-link,
+    .nav-sidebar .nav-link {
+        transition: none;
+    }
+}
+
+
+/* ============================================================
+   USUARIO AUTENTICADO Y CIERRE DE SESIÓN
+   ============================================================ */
+
+.pinax-navbar-user {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    min-height: 38px;
+    margin-right: 0.6rem;
+    padding: 0.35rem 0.75rem;
+    color: #f1f3f4;
+    background: rgba(26, 153, 247, 0.08);
+    border: 1px solid rgba(26, 153, 247, 0.18);
+    border-radius: 12px;
+}
+
+.pinax-navbar-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 31px;
+    height: 31px;
+    color: #ffffff;
+    background: linear-gradient(135deg, #1a99f7, #b024cb);
+    border-radius: 10px;
+    box-shadow: 0 0 14px rgba(26, 153, 247, 0.25);
+}
+
+.pinax-navbar-user-info {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.1;
+}
+
+.pinax-navbar-user-info strong {
+    max-width: 160px;
+    overflow: hidden;
+    color: #f1f3f4;
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pinax-navbar-user-info small {
+    margin-top: 0.2rem;
+    color: #a2a8b1;
+    font-size: 0.68rem;
+}
+
+.pinax-logout-form {
+    display: flex;
+    align-items: center;
+    margin: 0;
+}
+
+.pinax-logout-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    min-height: 38px;
+    padding: 0.45rem 0.85rem;
+    color: #f1f3f4;
+    font-size: 0.82rem;
+    font-weight: 600;
+    background: rgba(176, 36, 203, 0.1);
+    border: 1px solid rgba(176, 36, 203, 0.35);
+    border-radius: 12px;
+    cursor: pointer;
+    transition:
+        color 0.2s ease,
+        background-color 0.2s ease,
+        border-color 0.2s ease,
+        box-shadow 0.2s ease,
+        transform 0.2s ease;
+}
+
+.pinax-logout-button:hover {
+    color: #ffffff;
+    background: linear-gradient(
+        135deg,
+        rgba(176, 36, 203, 0.85),
+        rgba(26, 153, 247, 0.85)
+    );
+    border-color: transparent;
+    box-shadow: 0 0 18px rgba(176, 36, 203, 0.28);
+    transform: translateY(-1px);
+}
+
+.pinax-logout-button:focus {
+    outline: 2px solid rgba(26, 153, 247, 0.5);
+    outline-offset: 2px;
+}
+
+.pinax-logout-button:active {
+    transform: translateY(0);
+}
+
+@media (max-width: 575.98px) {
+    .pinax-logout-button {
+        width: 38px;
+        padding: 0;
+    }
+}

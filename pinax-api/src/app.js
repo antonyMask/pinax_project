@@ -36,6 +36,12 @@ app.use(cors());
 // Middleware para permitir que Express lea datos en formato JSON.
 app.use(express.json());
 
+// Importamos las rutas del modulo de autenticacion
+const authRoutes = require('./routes/auth.routes');
+
+// Las rutas de autenticacion comienzan con /api/auth.
+app.use('/api/auth', authRoutes);
+
 // Registramos las rutas del modulo pesonas.
 // Todas las rutas de personas comenzaran con /api/personas
 app.use('/api/personas', personasRoutes);

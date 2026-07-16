@@ -3,7 +3,8 @@ const express = require('express');
 // Importamos el metodo GET del controlador de asientos.
 const {
     obtenerAsientos,
-    crearAsiento
+    crearAsiento,
+    actualizarAsiento
 } = require('../controllers/asientos.controller');
 
 const router = express.Router();
@@ -27,6 +28,7 @@ router.post('/', crearAsiento);
    - actualiza la cabecera de un asiento contable.
    - permite soft delete cambiando ind_estado a anulado.
 */
+router.put('/:cod_asiento', actualizarAsiento);
 
 // Exportamos las rutas del modulo de asientos.
 module.exports = router;
