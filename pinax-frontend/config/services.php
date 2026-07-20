@@ -40,7 +40,7 @@ return [
     Laravel actuara exclusivamente como un cliente de la API.
     */
     'pinax' => [
-        'base_url' => env('PINAX_API_URL', 'http://127.7.7.1:3000/api'),
+        'base_url' => env('PINAX_API_URL', 'http://127.0.0.1:3000/api'),
         'timeout' => (int) env('PINAX_API_TIMEOUT', 10),
     ],
 
