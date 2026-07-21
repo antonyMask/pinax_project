@@ -8,7 +8,9 @@ const { pool } = require('../config/db');
     - centralizan los estados permitidos para los saldos de mayorizacion.
     - se usan en GET, POST y PUT.
 */
-const ESTADOS_SALDO = ['abierto', 'cerrado', 'recalculado'];
+const ESTADOS_SALDO = ['abierto', 'recalculando', 'cerrado','inactivo'];
+const VISTAS_MAYORIZACION = ['resumen', 'cuenta_t', 'opciones'];
+const ACCIONES_MAYORIZACION = ['recalcular', 'cerrar', 'inactivar'];
 
 /*
     Funcion auxiliar: limpiarTexto
@@ -84,106 +86,229 @@ const esNumeroNoNegativo = (valor) => {
     return esNumero(valor) && Number(valor) >= 0;
 };
 
+
 /*
-    Controlador: obtenerSaldosCuentas
+    Funcion auxiliar: fueEnviado
+    Distingue entre:
+    - un parametro que no fue enviado.
+    - un parametro que si fue enviado, pero puede ser invalido.
 
-    Funcion:
-    - consulta los saldos de cuenta por periodo.
-    - permite listar todos los saldos.
-    - permite filtrar por cod_saldo.
-    - permite filtrar por cod_periodo.
-    - permite filtrar por cod_cuenta.
-    - permite filtrar por ind_estado.
+    Esto evita que los valores como 0 sean confundidos con la ausencia del campo.
+*/
+const fueEnviado = (valor) => {
+    return valor !== undefined &&
+           valor !== null &&
+           valor !== '';
+};
 
-    Metodo HTTP:
-    - GET
+/* Funcion auxiliar: obtenerConjuntosDeResultados */
+const obtenerConjuntosDeResultados = (resultado) => {
+    if (!Array.isArray(resultado)) {
+        return [];
+    }
 
-    Rutas esperadas:
-    - GET /api/mayorizacion
-    - GET /api/mayorizacion?cod_saldo=1
-    - GET /api/mayorizacion?cod_periodo=1
-    - GET /api/mayorizacion?cod_cuenta=5
-    - GET /api/mayorizacion?ind_estado=abierto
-    - GET /api/mayorizacion?ind_estado=cerrado
+    return resultado.filter((elemento) => {
+        return Array.isArray(elemento);
+    });
+};
+
+/* Funcion auxiliar: responderErrorBaseDatos */
+const responderErrorBaseDatos = (res, error, mensajeInterno) => {
+    console.error(mensajeInterno, {
+        codigo: error.code,
+        estadoSql: error.sqlState,
+        numero: error.errno,
+        mensaje: error.message,
+        sql: error.sql
+    });
+
+    if (error.sqlState === '45000') {
+        return res.status(400).json({
+            estado: 'error',
+            mensaje: error.sqlMessage || 'Error de validación en la base de datos'
+        });
+    }
+
+    if (error.code === 'ER_DUP_ENTRY') {
+        return res.status(400).json({
+            estado: 'error',
+            mensaje: 'La cuenta ya fue mayorizada en el período seleccionado'
+        });
+    }
+
+    return res.status(500).json({
+        estado: 'error',
+        mensaje: 'Error interno en el modulo de Cuentas T y Mayorización'
+    });
+};
+
+/*
+    Controlador GET: obtenerSaldosCuentas
+
+    Utiliza el mismo endpoint para tres tipos de consulta:
+    - resumen: saldos mayorizados.
+    - cuenta_t: resumen y movimientos individuales.
+    - opciones: cuentas y periodos disponibles.
 */
 const obtenerSaldosCuentas = async (req, res) => {
     try {
-        // Extraemos los filtros enviados por query params.
+        /*
+            Los filtros GET se reciben mediante req.query.
+
+            Si no se envía una vista, utilizamos "resumen"
+            como comportamiento predeterminado.
+        */
+        const vista = normalizarTexto(req.query.vista) || 'resumen';
+        const estado = normalizarTexto(req.query.ind_estado);
+
         const {
             cod_saldo,
             cod_periodo,
-            cod_cuenta,
-            ind_estado
+            cod_cuenta
         } = req.query;
 
-        // Validamos cod_saldo si fue enviado.
-        if (cod_saldo && !esEnteroPositivo(cod_saldo)) {
-            return res.status(400).json({
-                estado: 'error',
-                mensaje: 'El parametro cod_saldo debe ser numerico y positivo'
-            });
-        }
-
-        // Validamos cod_periodo si fue enviado.
-        if (cod_periodo && !esEnteroPositivo(cod_periodo)) {
-            return res.status(400).json({
-                estado: 'error',
-                mensaje: 'El parametro cod_periodo debe ser numerico y positivo'
-            });
-        }
-
-        // Validamos cod_cuenta si fue enviado.
-        if (cod_cuenta && !esEnteroPositivo(cod_cuenta)) {
-            return res.status(400).json({
-                estado: 'error',
-                mensaje: 'El parametro cod_cuenta debe ser numerico y positivo'
-            });
-        }
-
-        // Normalizamos el estado recibido.
-        const indEstadoParam = normalizarTexto(ind_estado);
-
-        // Validamos ind_estado si fue enviado.
-        if (indEstadoParam && !ESTADOS_SALDO.includes(indEstadoParam)) {
-            return res.status(400).json({
-                estado: 'error',
-                mensaje: 'El parametro ind_estado solo permite: abierto, cerrado o recalculado'
-            });
-        }
-
         /*
-            Convertimos los parametros.
-
-            Si un filtro no viene informado, se envia null.
-            El procedimiento almacenado interpreta null como no aplicar filtro.
+            Validamos la vista utilizando la lista blanca definida
+            al inicio del controlador.
         */
-        const codSaldoParam = cod_saldo ? Number(cod_saldo) : null;
-        const codPeriodoParam = cod_periodo ? Number(cod_periodo) : null;
-        const codCuentaParam = cod_cuenta ? Number(cod_cuenta) : null;
+        if (!VISTAS_MAYORIZACION.includes(vista)) {
+            return res.status(400).json({
+                estado: 'error',
+                mensaje: 'El parámetro vista solo permite: resumen, cuenta_t u opciones'
+            });
+        }
 
         /*
-            Ejecutamos el procedimiento almacenado real del modulo.
+            Los identificadores son opcionales para algunas consultas,
+            pero si fueron enviados deben ser enteros positivos.
+        */
+        if (fueEnviado(cod_saldo) && !esEnteroPositivo(cod_saldo)) {
+            return res.status(400).json({
+                estado: 'error',
+                mensaje: 'El parámetro cod_saldo debe ser numérico y positivo'
+            });
+        }
 
-            Orden de parametros:
-            1. cod_saldo
-            2. cod_periodo
-            3. cod_cuenta
-            4. ind_estado
+        if (fueEnviado(cod_periodo) && !esEnteroPositivo(cod_periodo)) {
+            return res.status(400).json({
+                estado: 'error',
+                mensaje: 'El parámetro cod_periodo debe ser numérico y positivo'
+            });
+        }
+
+        if (fueEnviado(cod_cuenta) && !esEnteroPositivo(cod_cuenta)) {
+            return res.status(400).json({
+                estado: 'error',
+                mensaje: 'El parámetro cod_cuenta debe ser numérico y positivo'
+            });
+        }
+
+        /*
+            El estado también es opcional, pero debe pertenecer
+            a los estados permitidos cuando se utilice.
+        */
+        if (estado && !ESTADOS_SALDO.includes(estado)) {
+            return res.status(400).json({
+                estado: 'error',
+                mensaje: 'El parámetro ind_estado no contiene un estado permitido'
+            });
+        }
+
+        /*
+            Una Cuenta T pertenece obligatoriamente a una cuenta
+            dentro de un periodo concreto.
+
+            Sin estos dos valores podríamos mezclar movimientos
+            que contablemente no corresponden.
+        */
+        if (
+            vista === 'cuenta_t'
+            && (
+                !esEnteroPositivo(cod_periodo)
+                || !esEnteroPositivo(cod_cuenta)
+            )
+        ) {
+            return res.status(400).json({
+                estado: 'error',
+                mensaje: 'La vista cuenta_t requiere cod_periodo y cod_cuenta'
+            });
+        }
+
+        /*
+            Ejecutamos el único procedimiento SELECT permitido.
+
+            Orden de los parámetros:
+            1. Tipo de vista.
+            2. Código del saldo.
+            3. Código del periodo.
+            4. Código de la cuenta.
+            5. Estado del saldo.
         */
         const [resultado] = await pool.query(
-            'CALL cm_sel_modulo_mayorizacion(?, ?, ?, ?)',
+            'CALL cm_sel_modulo_mayorizacion(?, ?, ?, ?, ?)',
             [
-                codSaldoParam,
-                codPeriodoParam,
-                codCuentaParam,
-                indEstadoParam
+                vista,
+                fueEnviado(cod_saldo)
+                    ? Number(cod_saldo)
+                    : null,
+                fueEnviado(cod_periodo)
+                    ? Number(cod_periodo)
+                    : null,
+                fueEnviado(cod_cuenta)
+                    ? Number(cod_cuenta)
+                    : null,
+                estado
             ]
         );
 
-        // MySQL devuelve el resultado principal en la primera posicion.
-        const saldos = resultado[0] || [];
+        /*
+            Separamos los conjuntos de filas devueltos por el
+            procedimiento de la información técnica del CALL.
+        */
+        const conjuntos = obtenerConjuntosDeResultados(resultado);
 
-        // Respondemos con los datos obtenidos.
+        /*
+            La consulta Cuenta T devuelve dos conjuntos:
+
+            conjuntos[0] = resumen de la cuenta.
+            conjuntos[1] = movimientos individuales.
+        */
+        if (vista === 'cuenta_t') {
+            const resumen = conjuntos[0]?.[0] || null;
+            const movimientos = conjuntos[1] || [];
+
+            return res.status(200).json({
+                estado: 'ok',
+                datos: {
+                    resumen,
+                    total_movimientos: movimientos.length,
+                    movimientos
+                }
+            });
+        }
+
+        /*
+            La vista de opciones también devuelve dos conjuntos:
+
+            conjuntos[0] = cuentas disponibles.
+            conjuntos[1] = periodos disponibles.
+        */
+        if (vista === 'opciones') {
+            return res.status(200).json({
+                estado: 'ok',
+                datos: {
+                    cuentas: conjuntos[0] || [],
+                    periodos: conjuntos[1] || []
+                }
+            });
+        }
+
+        /*
+            Si no se solicitó cuenta_t ni opciones,
+            respondemos con el resumen de Mayorización.
+        */
+        const saldos = conjuntos[0] || [];
+
         return res.status(200).json({
             estado: 'ok',
             total: saldos.length,
@@ -191,81 +316,49 @@ const obtenerSaldosCuentas = async (req, res) => {
         });
 
     } catch (error) {
-        // Mostramos el error tecnico en consola para depuracion.
-        console.error('Error al obtener saldos de cuentas:', {
-            codigo: error.code,
-            estadoSql: error.sqlState,
-            numero: error.errno,
-            mensaje: error.message,
-            sql: error.sql
-        });
-
-        // Capturamos errores controlados enviados desde MySQL.
-        if (error.sqlState === '45000') {
-            return res.status(400).json({
-                estado: 'error',
-                mensaje: error.sqlMessage || 'Error de validacion en la base de datos'
-            });
-        }
-
-        // Respondemos con un mensaje controlado para el cliente.
-        return res.status(500).json({
-            estado: 'error',
-            mensaje: 'Error interno al consultar el modulo de saldos y mayorizacion'
-        });
+        /*
+            Delegamos el tratamiento del error a la función auxiliar
+            creada en el bloque anterior.
+        */
+        return responderErrorBaseDatos(
+            res,
+            error,
+            'Error al consultar Cuentas T y Mayorización'
+        );
     }
 };
 
+
+
 /*
-    Controlador: crearSaldoCuenta
+    Controlador POST: crearSaldoCuenta
 
-    Funcion:
-    - registra un nuevo saldo de cuenta por periodo.
-    - valida que la cuenta exista.
-    - valida que el periodo contable exista.
-    - evita duplicar una misma cuenta en el mismo periodo.
-    - el procedimiento calcula automaticamente el saldo final.
-
-    Metodo HTTP:
-    - POST
-
-    Ruta esperada:
-    - POST /api/mayorizacion
+    El cliente solamente indica la cuenta y el periodo.
+    Los importes se calculan en MySQL desde los asientos aprobados.
 */
 const crearSaldoCuenta = async (req, res) => {
+    /*
+        Guardaremos aquí una conexión individual del pool.
+
+        La necesitamos porque la variable OUT del procedimiento pertenece
+        exclusivamente a la sesión de MySQL que ejecutó el CALL.
+    */
     let connection;
 
     try {
-        // Capturamos los datos enviados en el body de la peticion.
+        /*
+            Si Express no recibe un cuerpo JSON, usamos un objeto vacío
+            para evitar errores al intentar acceder a sus propiedades.
+        */
         const bodyData = req.body || {};
 
         const codCuenta = bodyData.cod_cuenta;
         const codPeriodo = bodyData.cod_periodo;
-        const salInicial = bodyData.sal_inicial;
-        const totDebe = bodyData.tot_debe;
-        const totHaber = bodyData.tot_haber;
 
         /*
-            Normalizamos el estado.
-            Si no se envia ind_estado, se toma "abierto" como valor por defecto.
+            Ambos identificadores son obligatorios y deben representar
+            registros válidos mediante números enteros positivos.
         */
-        const indEstado = normalizarTexto(bodyData.ind_estado) || 'abierto';
-
-        // Validamos campos obligatorios.
-        if (
-            codCuenta === undefined ||
-            codPeriodo === undefined ||
-            salInicial === undefined ||
-            totDebe === undefined ||
-            totHaber === undefined
-        ) {
-            return res.status(400).json({
-                estado: 'error',
-                mensaje: 'Faltan campos obligatorios para registrar el saldo de cuenta'
-            });
-        }
-
-        // Validamos que cod_cuenta sea un entero positivo.
         if (!esEnteroPositivo(codCuenta)) {
             return res.status(400).json({
                 estado: 'error',
@@ -273,7 +366,6 @@ const crearSaldoCuenta = async (req, res) => {
             });
         }
 
-        // Validamos que cod_periodo sea un entero positivo.
         if (!esEnteroPositivo(codPeriodo)) {
             return res.status(400).json({
                 estado: 'error',
@@ -281,200 +373,143 @@ const crearSaldoCuenta = async (req, res) => {
             });
         }
 
-        // Validamos que sal_inicial sea numerico.
-        if (!esNumero(salInicial)) {
+        /*
+            Estos campos pertenecen exclusivamente al cálculo contable.
+
+            Los rechazamos expresamente para impedir que una interfaz antigua
+            o un usuario intente introducir saldos manualmente.
+        */
+        const camposControlados = [
+            'sal_inicial',
+            'tot_debe',
+            'tot_haber',
+            'sal_final',
+            'ind_estado'
+        ];
+
+        /*
+            hasOwnProperty comprueba si el campo fue enviado, incluso si su
+            valor es cero, null o una cadena vacía.
+        */
+        const contieneCamposControlados = camposControlados.some((campo) => {
+            return Object.prototype.hasOwnProperty.call(bodyData, campo);
+        });
+
+        if (contieneCamposControlados) {
             return res.status(400).json({
                 estado: 'error',
-                mensaje: 'El campo sal_inicial debe ser numerico'
+                mensaje: 'Los saldos y el estado son calculados por el sistema y no deben enviarse'
             });
         }
 
         /*
-            Validamos debe y haber.
-            El saldo inicial puede ser negativo si contablemente aplica,
-            pero tot_debe y tot_haber no deben ser negativos.
+            Obtenemos una conexión individual.
+
+            No usamos pool.query directamente porque debemos ejecutar el CALL
+            y consultar la variable OUT dentro de la misma sesión de MySQL.
         */
-        if (!esNumeroNoNegativo(totDebe)) {
-            return res.status(400).json({
-                estado: 'error',
-                mensaje: 'El campo tot_debe debe ser numerico y mayor o igual que cero'
-            });
-        }
-
-        if (!esNumeroNoNegativo(totHaber)) {
-            return res.status(400).json({
-                estado: 'error',
-                mensaje: 'El campo tot_haber debe ser numerico y mayor o igual que cero'
-            });
-        }
-
-        // Validamos el estado del saldo.
-        if (!ESTADOS_SALDO.includes(indEstado)) {
-            return res.status(400).json({
-                estado: 'error',
-                mensaje: 'El campo ind_estado solo permite: abierto, cerrado o recalculado'
-            });
-        }
-
-        // Obtenemos una conexion individual porque usaremos una variable OUT.
         connection = await pool.getConnection();
 
-        // Validamos que la cuenta contable exista.
-        const [cuentaExiste] = await connection.query(
-            'SELECT cod_cuenta FROM cc_catalogo_cuenta WHERE cod_cuenta = ? LIMIT 1',
-            [Number(codCuenta)]
-        );
-
-        if (cuentaExiste.length === 0) {
-            return res.status(400).json({
-                estado: 'error',
-                mensaje: 'La cuenta contable indicada no existe'
-            });
-        }
-
-        // Validamos que el periodo contable exista.
-        const [periodoExiste] = await connection.query(
-            'SELECT cod_periodo FROM ga_periodo_contable WHERE cod_periodo = ? LIMIT 1',
-            [Number(codPeriodo)]
-        );
-
-        if (periodoExiste.length === 0) {
-            return res.status(400).json({
-                estado: 'error',
-                mensaje: 'El periodo contable indicado no existe'
-            });
-        }
-
         /*
-            Validamos que no exista ya un saldo para la misma cuenta y periodo.
-            Esto evita duplicar informacion en la mayorizacion.
-        */
-        const [saldoDuplicado] = await connection.query(
-            `
-            SELECT cod_saldo
-            FROM cm_saldo_cuenta_periodo
-            WHERE cod_cuenta = ?
-              AND cod_periodo = ?
-            LIMIT 1
-            `,
-            [Number(codCuenta), Number(codPeriodo)]
-        );
-
-        if (saldoDuplicado.length > 0) {
-            return res.status(400).json({
-                estado: 'error',
-                mensaje: 'Ya existe un saldo registrado para esta cuenta en este periodo'
-            });
-        }
-
-        /*
-            Ejecutamos el procedimiento almacenado.
-            Orden de parametros:
-            1. cod_cuenta
-            2. cod_periodo
-            3. sal_inicial
-            4. tot_debe
-            5. tot_haber
-            6. ind_estado
-            7. OUT cod_saldo_generado
+            El procedimiento recibe:
+            1. Código de la cuenta.
+            2. Código del periodo.
+            3. Variable OUT donde devolverá el saldo creado.
         */
         await connection.query(
-            'CALL cm_ins_modulo_mayorizacion(?, ?, ?, ?, ?, ?, @p_cod_saldo_generado)',
+            'CALL cm_ins_modulo_mayorizacion(?, ?, @p_cod_saldo_generado)',
             [
                 Number(codCuenta),
-                Number(codPeriodo),
-                Number(salInicial),
-                Number(totDebe),
-                Number(totHaber),
-                indEstado
+                Number(codPeriodo)
             ]
         );
 
-        // Leemos el parametro OUT generado por el procedimiento.
+        /*
+            Consultamos la variable OUT utilizando exactamente
+            la misma conexión.
+        */
         const [resultadoSalida] = await connection.query(
             'SELECT @p_cod_saldo_generado AS cod_saldo'
         );
 
+        /*
+            mysql2 devuelve las filas dentro de la primera posición.
+            Mediante encadenamiento opcional evitamos errores si no hay filas.
+        */
         const codSaldoGenerado = resultadoSalida[0]?.cod_saldo;
 
-        // Validamos que el procedimiento haya devuelto un codigo generado.
+        /*
+            Esta condición detectaría una ejecución anormal:
+            el procedimiento terminó, pero no devolvió el identificador.
+        */
         if (!codSaldoGenerado) {
-            return res.status(400).json({
+            return res.status(500).json({
                 estado: 'error',
-                mensaje: 'No se pudo registrar el saldo. Revise las restricciones de cuenta, periodo o estado.'
+                mensaje: 'La base de datos no devolvio el saldo generado'
             });
         }
 
-        // Respondemos con el codigo generado.
+        /*
+            HTTP 201 indica que se creó correctamente un recurso.
+        */
         return res.status(201).json({
             estado: 'ok',
-            mensaje: 'Saldo de cuenta y mayorizacion registrado correctamente',
+            mensaje: 'Cuenta mayorizada correctamente desde sus asientos aprobados',
             cod_saldo: codSaldoGenerado
         });
 
     } catch (error) {
-        // Mostramos el error tecnico en consola.
-        console.error('Error al crear saldo de cuenta:', {
-            codigo: error.code,
-            estadoSql: error.sqlState,
-            numero: error.errno,
-            mensaje: error.message,
-            sql: error.sql
-        });
-
-        // Capturamos errores controlados enviados desde MySQL.
-        if (error.sqlState === '45000') {
-            return res.status(400).json({
-                estado: 'error',
-                mensaje: error.sqlMessage || 'Error de validacion en la base de datos'
-            });
-        }
-
-        // Capturamos duplicados por restricciones unique, si existieran.
-        if (error.code === 'ER_DUP_ENTRY') {
-            return res.status(400).json({
-                estado: 'error',
-                mensaje: 'Ya existe un registro duplicado en la base de datos'
-            });
-        }
-
-        // Respuesta general para errores no controlados.
-        return res.status(500).json({
-            estado: 'error',
-            mensaje: 'Error interno al registrar el saldo de cuenta'
-        });
+        /*
+            Los errores contables generados con SIGNAL serán convertidos
+            en respuestas 400 por la función compartida.
+        */
+        return responderErrorBaseDatos(
+            res,
+            error,
+            'Error al ejecutar la primera mayorizacion'
+        );
 
     } finally {
-        // Liberamos la conexion si fue tomada del pool.
-        if (connection) connection.release();
+        /*
+            Toda conexión obtenida manualmente debe regresar al pool,
+            tanto si la operación funcionó como si produjo un error.
+        */
+        if (connection) {
+            connection.release();
+        }
     }
 };
 
 
 
 /*
-    Controlador: actualizarSaldoCuenta
+    Controlador PUT: actualizarSaldoCuenta
 
-    Funcion:
-    - actualiza un saldo de cuenta por periodo.
-    - recalcula automaticamente el saldo final mediante el procedimiento almacenado.
-    - permite aplicar soft delete cambiando ind_estado a "cerrado".
-    - no permite modificar saldos que ya estan cerrados.
-
-    Metodo HTTP:
-    - PUT
-
-    Ruta esperada:
-    - PUT /api/mayorizacion/:cod_saldo
+    Acciones disponibles:
+    - recalcular: vuelve a obtener los importes desde los asientos aprobados.
+    - cerrar: consolida el saldo de un periodo contable cerrado.
+    - inactivar: realiza el soft delete del registro.
 */
 const actualizarSaldoCuenta = async (req, res) => {
-    let connection;
-
     try {
-        // Extraemos el codigo del saldo desde la URL.
+        /*
+            El código del saldo se recibe como parámetro de la URL:
+            PUT /api/mayorizacion/1
+            Express guarda el valor "1" dentro de req.params.cod_saldo.
+        */
         const { cod_saldo } = req.params;
 
-        // Validamos que cod_saldo sea numerico y positivo.
+        /*
+            La acción solicitada se recibe en el cuerpo JSON.
+            Si req.body no existe, usamos un objeto vacío para evitar errores.
+        */
+        const bodyData = req.body || {};
+        const accion = normalizarTexto(bodyData.accion);
+
+        /*
+            El registro que se modificará debe identificarse mediante
+            un número entero positivo.
+        */
         if (!esEnteroPositivo(cod_saldo)) {
             return res.status(400).json({
                 estado: 'error',
@@ -482,195 +517,123 @@ const actualizarSaldoCuenta = async (req, res) => {
             });
         }
 
-        // Convertimos el codigo del saldo a numero.
-        const codSaldo = Number(cod_saldo);
-
-        // Capturamos los datos enviados en el body de la peticion.
-        const bodyData = req.body || {};
-
-        const salInicial = bodyData.sal_inicial;
-        const totDebe = bodyData.tot_debe;
-        const totHaber = bodyData.tot_haber;
-
         /*
-            Normalizamos el estado.
-
-            Para actualizar normalmente se puede usar:
-            - abierto
-            - recalculado
-
-            Para soft delete logico se usa:
-            - cerrado
+            Solo permitimos las acciones definidas en la lista blanca
+            ACCIONES_MAYORIZACION.
         */
-        const indEstado = normalizarTexto(bodyData.ind_estado);
-
-        // Validamos campos obligatorios.
-        if (
-            salInicial === undefined ||
-            totDebe === undefined ||
-            totHaber === undefined ||
-            !indEstado
-        ) {
+        if (!accion || !ACCIONES_MAYORIZACION.includes(accion)) {
             return res.status(400).json({
                 estado: 'error',
-                mensaje: 'Faltan campos obligatorios para actualizar el saldo de cuenta'
-            });
-        }
-
-        // Validamos que sal_inicial sea numerico.
-        if (!esNumero(salInicial)) {
-            return res.status(400).json({
-                estado: 'error',
-                mensaje: 'El campo sal_inicial debe ser numerico'
+                mensaje: 'El campo accion solo permite: recalcular, cerrar o inactivar'
             });
         }
 
         /*
-            Validamos tot_debe y tot_haber.
+            El método PUT tampoco debe recibir importes ni estados manuales.
 
-            Permitimos sal_inicial negativo si contablemente aplica,
-            pero tot_debe y tot_haber no deben ser negativos.
+            MySQL determina:
+            - saldo inicial;
+            - total del debe;
+            - total del haber;
+            - saldo final;
+            - nuevo estado.
         */
-        if (!esNumeroNoNegativo(totDebe)) {
-            return res.status(400).json({
-                estado: 'error',
-                mensaje: 'El campo tot_debe debe ser numerico y mayor o igual que cero'
-            });
-        }
-
-        if (!esNumeroNoNegativo(totHaber)) {
-            return res.status(400).json({
-                estado: 'error',
-                mensaje: 'El campo tot_haber debe ser numerico y mayor o igual que cero'
-            });
-        }
-
-        // Validamos que el estado sea permitido por la base de datos.
-        if (!ESTADOS_SALDO.includes(indEstado)) {
-            return res.status(400).json({
-                estado: 'error',
-                mensaje: 'El campo ind_estado solo permite: abierto, cerrado o recalculado'
-            });
-        }
-
-        // Obtenemos una conexion del pool.
-        connection = await pool.getConnection();
+        const camposControlados = [
+            'sal_inicial',
+            'tot_debe',
+            'tot_haber',
+            'sal_final',
+            'ind_estado'
+        ];
 
         /*
-            Validamos que el saldo exista antes de llamar al procedimiento.
-
-            Esto es importante porque el procedimiento tiene handler interno
-            y puede hacer rollback sin devolver un error claro a Node.
+            Verificamos si el cliente intentó enviar alguno de los
+            campos que son responsabilidad del procedimiento almacenado.
         */
-        const [saldoActual] = await connection.query(
-            `
-            SELECT 
-                cod_saldo,
-                ind_estado
-            FROM cm_saldo_cuenta_periodo
-            WHERE cod_saldo = ?
-            LIMIT 1
-            `,
-            [codSaldo]
-        );
+        const contieneCamposControlados = camposControlados.some((campo) => {
+            return Object.prototype.hasOwnProperty.call(bodyData, campo);
+        });
 
-        if (saldoActual.length === 0) {
-            return res.status(404).json({
+        if (contieneCamposControlados) {
+            return res.status(400).json({
                 estado: 'error',
-                mensaje: 'El saldo de cuenta indicado no existe'
+                mensaje: 'Use accion; los saldos y el estado no deben enviarse manualmente'
             });
         }
 
         /*
-            Validamos que no se modifique un saldo cerrado.
-            En este modulo, "cerrado" funciona como cierre logico o soft delete.
-        */
-        if (saldoActual[0].ind_estado === 'cerrado') {
-            return res.status(400).json({
-                estado: 'error',
-                mensaje: 'No se puede modificar un saldo que ya esta cerrado'
-            });
-        }
+            Ejecutamos el único procedimiento UPDATE del módulo.
 
-        /*
-            Ejecutamos el procedimiento almacenado.
-            Orden de parametros:
-            1. cod_saldo
-            2. sal_inicial
-            3. tot_debe
-            4. tot_haber
-            5. ind_estado
+            Parámetros:
+            1. Código del saldo que se modificará.
+            2. Acción que debe realizar el procedimiento.
         */
-        await connection.query(
-            'CALL cm_upd_modulo_mayorizacion(?, ?, ?, ?, ?)',
+        await pool.query(
+            'CALL cm_upd_modulo_mayorizacion(?, ?)',
             [
-                codSaldo,
-                Number(salInicial),
-                Number(totDebe),
-                Number(totHaber),
-                indEstado
+                Number(cod_saldo),
+                accion
             ]
         );
 
         /*
-            Consultamos el saldo actualizado para confirmar el resultado.
-            Esto permite devolver al cliente el sal_final recalculado.
+            Después de actualizar, recuperamos el registro utilizando
+            el procedimiento SELECT existente.
+
+            No hacemos una consulta SQL directa desde el controlador.
         */
-        const [saldoActualizado] = await connection.query(
-            `
-            SELECT 
-                cod_saldo,
-                cod_cuenta,
-                cod_periodo,
-                sal_inicial,
-                tot_debe,
-                tot_haber,
-                sal_final,
-                ind_estado,
-                fec_actualizacion
-            FROM cm_saldo_cuenta_periodo
-            WHERE cod_saldo = ?
-            LIMIT 1
-            `,
-            [codSaldo]
+        const estadoFiltro = accion === 'inactivar'
+            ? 'inactivo'
+            : null;
+
+        const [resultadoConsulta] = await pool.query(
+            'CALL cm_sel_modulo_mayorizacion(?, ?, ?, ?, ?)',
+            [
+                'resumen',
+                Number(cod_saldo),
+                null,
+                null,
+                estadoFiltro
+            ]
         );
 
-        // Respondemos confirmando la actualizacion o el cierre logico.
+        /*
+            Extraemos los conjuntos de filas devueltos por el CALL
+            y tomamos el primer registro encontrado.
+        */
+        const conjuntos = obtenerConjuntosDeResultados(resultadoConsulta);
+        const saldoActualizado = conjuntos[0]?.[0] || null;
+
+        /*
+            Cada acción devuelve un mensaje específico para que Laravel
+            pueda mostrar una notificación comprensible al usuario.
+        */
+        const mensajes = {
+            recalcular: 'Mayorizacion recalculada desde los asientos aprobados',
+            cerrar: 'Saldo mayorizado cerrado correctamente',
+            inactivar: 'Saldo mayorizado inactivado mediante soft delete'
+        };
+
+        /*
+            HTTP 200 indica que el recurso existente fue actualizado
+            correctamente y devolvemos su estado resultante.
+        */
         return res.status(200).json({
             estado: 'ok',
-            mensaje: indEstado === 'cerrado'
-                ? 'Saldo de cuenta cerrado correctamente como soft delete logico'
-                : 'Saldo de cuenta actualizado correctamente',
-            datos: saldoActualizado[0]
+            mensaje: mensajes[accion],
+            datos: saldoActualizado
         });
 
     } catch (error) {
-        // Mostramos el error tecnico en consola.
-        console.error('Error al actualizar saldo de cuenta:', {
-            codigo: error.code,
-            estadoSql: error.sqlState,
-            numero: error.errno,
-            mensaje: error.message,
-            sql: error.sql
-        });
-
-        // Capturamos errores controlados enviados desde MySQL.
-        if (error.sqlState === '45000') {
-            return res.status(400).json({
-                estado: 'error',
-                mensaje: error.sqlMessage || 'Error de validacion en la base de datos'
-            });
-        }
-
-        // Respuesta general para errores no controlados.
-        return res.status(500).json({
-            estado: 'error',
-            mensaje: 'Error interno al actualizar el saldo de cuenta'
-        });
-
-    } finally {
-        // Liberamos la conexion si fue tomada del pool.
-        if (connection) connection.release();
+        /*
+            Los errores de negocio generados por el procedimiento
+            se convierten en respuestas HTTP mediante la función compartida.
+        */
+        return responderErrorBaseDatos(
+            res,
+            error,
+            'Error al actualizar la mayorizacion'
+        );
     }
 };
 

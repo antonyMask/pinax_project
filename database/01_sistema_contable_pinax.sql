@@ -105,14 +105,14 @@ CREATE TABLE `cm_saldo_cuenta_periodo` (
   `tot_debe` decimal(14,2) NOT NULL DEFAULT 0.00 COMMENT 'total del debe en el periodo',
   `tot_haber` decimal(14,2) NOT NULL DEFAULT 0.00 COMMENT 'total del haber en el periodo',
   `sal_final` decimal(14,2) NOT NULL DEFAULT 0.00 COMMENT 'saldo final de la cuenta',
-  `ind_estado` enum('abierto','cerrado','recalculado') NOT NULL DEFAULT 'abierto' COMMENT 'estado del saldo',
+  `ind_estado` enum('abierto','cerrado','recalculado','inactivo') NOT NULL DEFAULT 'abierto' COMMENT 'estado contable y eliminacion logica del saldo',
   `fec_actualizacion` datetime NOT NULL DEFAULT current_timestamp() COMMENT 'fecha de actualizacion del saldo',
   PRIMARY KEY (`cod_saldo`),
   UNIQUE KEY `uk_cm_saldo_cuenta_periodo` (`cod_cuenta`,`cod_periodo`),
   KEY `idx_cm_saldo_cuenta_periodo_periodo` (`cod_periodo`),
   CONSTRAINT `fk_cm_saldo_cuenta_periodo_cuenta` FOREIGN KEY (`cod_cuenta`) REFERENCES `cc_catalogo_cuenta` (`cod_cuenta`),
   CONSTRAINT `fk_cm_saldo_cuenta_periodo_periodo` FOREIGN KEY (`cod_periodo`) REFERENCES `ga_periodo_contable` (`cod_periodo`)
-) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='saldos acumulados por cuenta y periodo';
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='saldos acumulados por cuenta y periodo';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -121,7 +121,7 @@ CREATE TABLE `cm_saldo_cuenta_periodo` (
 
 LOCK TABLES `cm_saldo_cuenta_periodo` WRITE;
 /*!40000 ALTER TABLE `cm_saldo_cuenta_periodo` DISABLE KEYS */;
-INSERT INTO `cm_saldo_cuenta_periodo` VALUES (1,1,1,1000.00,700.00,250.00,1450.00,'recalculado','2026-06-29 16:09:19'),(2,2,1,0.00,0.00,800.00,800.00,'abierto','2026-06-05 20:41:15'),(3,3,1,0.00,0.00,10000.00,10000.00,'abierto','2026-06-05 20:41:15'),(4,4,1,0.00,0.00,5000.00,5000.00,'abierto','2026-06-05 20:41:15'),(5,5,1,0.00,2000.00,0.00,2000.00,'abierto','2026-06-05 20:41:15'),(6,6,1,0.00,15000.00,3000.00,12000.00,'abierto','2026-06-05 20:41:15'),(7,7,1,0.00,3000.00,1200.00,1800.00,'abierto','2026-06-05 20:41:15'),(8,8,1,0.00,0.00,800.00,800.00,'abierto','2026-06-05 20:41:15'),(9,9,1,0.00,0.00,10000.00,10000.00,'abierto','2026-06-05 20:41:15'),(10,10,1,0.00,0.00,5000.00,5000.00,'abierto','2026-06-05 20:41:15'),(11,12,1,0.00,2000.00,300.00,1700.00,'recalculado','2026-06-11 20:48:04'),(12,15,1,0.00,2000.00,300.00,1700.00,'recalculado','2026-06-11 20:59:41'),(13,16,1,0.00,2000.00,300.00,1700.00,'recalculado','2026-06-11 20:59:54'),(14,21,1,0.00,2000.00,300.00,1700.00,'recalculado','2026-06-11 21:10:12'),(15,1,2,2000.00,500.00,200.00,2300.00,'abierto','2026-06-29 15:53:59'),(16,5,2,1000.00,500.00,200.00,1300.00,'abierto','2026-06-29 16:00:03');
+INSERT INTO `cm_saldo_cuenta_periodo` VALUES (1,5,1,0.00,2000.00,0.00,2000.00,'abierto','2026-06-05 20:41:15'),(2,6,1,0.00,15000.00,3000.00,12000.00,'abierto','2026-06-05 20:41:15'),(3,7,1,0.00,3000.00,1200.00,1800.00,'abierto','2026-06-05 20:41:15'),(4,8,1,0.00,0.00,800.00,800.00,'abierto','2026-06-05 20:41:15'),(5,9,1,0.00,0.00,10000.00,10000.00,'abierto','2026-06-05 20:41:15'),(6,10,1,0.00,0.00,5000.00,5000.00,'abierto','2026-06-05 20:41:15');
 /*!40000 ALTER TABLE `cm_saldo_cuenta_periodo` ENABLE KEYS */;
 UNLOCK TABLES;
 
