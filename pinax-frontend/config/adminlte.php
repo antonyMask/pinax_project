@@ -275,10 +275,8 @@ return [
 
         /*
         |--------------------------------------------------------------------------
-        | Próximos módulos
+        | CONTABILIDAD
         |--------------------------------------------------------------------------
-        | Se muestran únicamente como referencia visual. No tienen enlace
-        | hasta que construyamos sus controladores y vistas en Laravel.
         */
 
         [
@@ -305,12 +303,17 @@ return [
             'label' => 'Próximo',
             'label_color' => 'info',
         ],
+
+        /*
+        |--------------------------------------------------------------------------
+        | REPORTES FINANCIEROS (ACTIVO)
+        |--------------------------------------------------------------------------
+        */
+
         [
-            'text' => 'Reportes',
-            'url' => '#',
+            'text' => 'Reportes Financieros',
+            'route' => 'reportes.index',
             'icon' => 'fas fa-fw fa-chart-bar',
-            'label' => 'Próximo',
-            'label_color' => 'info',
         ],
     ],
 
