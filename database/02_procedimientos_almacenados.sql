@@ -510,357 +510,539 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
-/*!50003 DROP PROCEDURE IF EXISTS `cm_ins_modulo_mayorizacion` */;
-/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
-/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
-/*!50003 SET @saved_col_connection = @@collation_connection */ ;
-/*!50003 SET character_set_client  = utf8mb4 */ ;
-/*!50003 SET character_set_results = utf8mb4 */ ;
-/*!50003 SET collation_connection  = utf8mb4_unicode_ci */ ;
-/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
-/*!50003 SET sql_mode              = 'NO_ZERO_IN_DATE,NO_ZERO_DATE,NO_ENGINE_SUBSTITUTION' */ ;
+DROP PROCEDURE IF EXISTS cm_ins_modulo_mayorizacion;
 DELIMITER ;;
-CREATE PROCEDURE `cm_ins_modulo_mayorizacion`(
-
+CREATE PROCEDURE cm_ins_modulo_mayorizacion(
     IN p_cod_cuenta BIGINT,
-
     IN p_cod_periodo BIGINT,
-
-    IN p_sal_inicial DECIMAL(14,2),
-
-    IN p_tot_debe DECIMAL(14,2),
-
-    IN p_tot_haber DECIMAL(14,2),
-
-    IN p_ind_estado VARCHAR(20),
-
     OUT p_cod_saldo_generado BIGINT
-
 )
 BEGIN
+    /* Datos necesarios para validar la cuenta y calcular su saldo. */
+    DECLARE v_naturaleza VARCHAR(20);
+    DECLARE v_estado_cuenta VARCHAR(20);
+    DECLARE v_acepta_movimiento VARCHAR(2);
 
-    DECLARE v_sal_final DECIMAL(14,2);
+    /* Datos del periodo que se va a mayorizar. */
+    DECLARE v_estado_periodo VARCHAR(20);
+    DECLARE v_fec_inicio DATE;
 
+    /* Importes calculados exclusivamente desde asientos aprobados. */
+    DECLARE v_sal_inicial DECIMAL(14,2) DEFAULT 0.00;
+    DECLARE v_tot_debe DECIMAL(14,2) DEFAULT 0.00;
+    DECLARE v_tot_haber DECIMAL(14,2) DEFAULT 0.00;
+    DECLARE v_sal_final DECIMAL(14,2) DEFAULT 0.00;
+    DECLARE v_cantidad_movimientos BIGINT DEFAULT 0;
 
-
+    /*
+        Si cualquier sentencia falla, se revierte toda la transaccion y
+        RESIGNAL conserva el error original para que la API pueda responderlo.
+    */
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
-
     BEGIN
-
         ROLLBACK;
-
         SET p_cod_saldo_generado = NULL;
-
+        RESIGNAL;
     END;
 
-
-
+    SET p_cod_saldo_generado = NULL;
     START TRANSACTION;
 
+    /* Los identificadores recibidos deben ser enteros positivos. */
+    IF p_cod_cuenta IS NULL OR p_cod_cuenta <= 0 THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Error: el codigo de cuenta es obligatorio y debe ser positivo.';
+    END IF;
 
+    IF p_cod_periodo IS NULL OR p_cod_periodo <= 0 THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Error: el codigo de periodo es obligatorio y debe ser positivo.';
+    END IF;
 
+    /* La cuenta debe existir antes de consultar sus propiedades contables. */
     IF NOT EXISTS (
-
         SELECT 1
-
         FROM cc_catalogo_cuenta
-
         WHERE cod_cuenta = p_cod_cuenta
-
     ) THEN
-
         SIGNAL SQLSTATE '45000'
-
-        SET MESSAGE_TEXT = 'Error: la cuenta contable no existe.';
-
+            SET MESSAGE_TEXT = 'Error: la cuenta contable no existe.';
     END IF;
-
-
-
-    IF NOT EXISTS (
-
-        SELECT 1
-
-        FROM ga_periodo_contable
-
-        WHERE cod_periodo = p_cod_periodo
-
-    ) THEN
-
-        SIGNAL SQLSTATE '45000'
-
-        SET MESSAGE_TEXT = 'Error: el periodo contable no existe.';
-
-    END IF;
-
-
-
-    IF p_ind_estado NOT IN ('abierto', 'cerrado', 'recalculado') THEN
-
-        SIGNAL SQLSTATE '45000'
-
-        SET MESSAGE_TEXT = 'Error: estado de saldo no valido.';
-
-    END IF;
-
-
-
-    SET v_sal_final = IFNULL(p_sal_inicial, 0.00)
-
-                    + IFNULL(p_tot_debe, 0.00)
-
-                    - IFNULL(p_tot_haber, 0.00);
-
-
-
-    INSERT INTO cm_saldo_cuenta_periodo (
-
-        cod_cuenta,
-
-        cod_periodo,
-
-        sal_inicial,
-
-        tot_debe,
-
-        tot_haber,
-
-        sal_final,
-
-        ind_estado,
-
-        fec_actualizacion
-
-    ) VALUES (
-
-        p_cod_cuenta,
-
-        p_cod_periodo,
-
-        IFNULL(p_sal_inicial, 0.00),
-
-        IFNULL(p_tot_debe, 0.00),
-
-        IFNULL(p_tot_haber, 0.00),
-
-        v_sal_final,
-
-        p_ind_estado,
-
-        NOW()
-
-    );
-
-
-
-    SET p_cod_saldo_generado = LAST_INSERT_ID();
-
-
-
-    COMMIT;
-
-END ;;
-DELIMITER ;
-/*!50003 SET sql_mode              = @saved_sql_mode */ ;
-/*!50003 SET character_set_client  = @saved_cs_client */ ;
-/*!50003 SET character_set_results = @saved_cs_results */ ;
-/*!50003 SET collation_connection  = @saved_col_connection */ ;
-/*!50003 DROP PROCEDURE IF EXISTS `cm_sel_modulo_mayorizacion` */;
-/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
-/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
-/*!50003 SET @saved_col_connection = @@collation_connection */ ;
-/*!50003 SET character_set_client  = utf8mb4 */ ;
-/*!50003 SET character_set_results = utf8mb4 */ ;
-/*!50003 SET collation_connection  = utf8mb4_unicode_ci */ ;
-/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
-/*!50003 SET sql_mode              = 'NO_ZERO_IN_DATE,NO_ZERO_DATE,NO_ENGINE_SUBSTITUTION' */ ;
-DELIMITER ;;
-CREATE PROCEDURE `cm_sel_modulo_mayorizacion`(
-
-    IN p_cod_saldo BIGINT,
-
-    IN p_cod_periodo BIGINT,
-
-    IN p_cod_cuenta BIGINT,
-
-    IN p_ind_estado VARCHAR(20)
-
-)
-BEGIN
 
     SELECT
+        ind_naturaleza,
+        ind_estado,
+        ind_acepta_movimiento
+    INTO
+        v_naturaleza,
+        v_estado_cuenta,
+        v_acepta_movimiento
+    FROM cc_catalogo_cuenta
+    WHERE cod_cuenta = p_cod_cuenta;
 
-        s.cod_saldo,
+    /* Solo las cuentas activas de detalle pueden recibir movimientos. */
+    IF v_estado_cuenta <> 'activo' THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Error: no se puede mayorizar una cuenta inactiva.';
+    END IF;
 
-        s.cod_cuenta,
+    IF v_acepta_movimiento <> 'si' THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Error: la cuenta seleccionada no acepta movimientos.';
+    END IF;
 
-        c.cod_num_cuenta,
+    /* El periodo debe existir y permanecer abierto para la primera mayorizacion. */
+    IF NOT EXISTS (
+        SELECT 1
+        FROM ga_periodo_contable
+        WHERE cod_periodo = p_cod_periodo
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Error: el periodo contable no existe.';
+    END IF;
 
-        c.nom_cuenta,
+    SELECT
+        ind_estado,
+        fec_inicio
+    INTO
+        v_estado_periodo,
+        v_fec_inicio
+    FROM ga_periodo_contable
+    WHERE cod_periodo = p_cod_periodo;
 
-        s.cod_periodo,
+    IF v_estado_periodo <> 'abierto' THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Error: solo se pueden mayorizar periodos abiertos.';
+    END IF;
 
-        p.nom_periodo,
+    /* La restriccion unica tambien protege este caso a nivel de tabla. */
+    IF EXISTS (
+        SELECT 1
+        FROM cm_saldo_cuenta_periodo
+        WHERE cod_cuenta = p_cod_cuenta
+          AND cod_periodo = p_cod_periodo
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Error: la cuenta ya fue mayorizada en este periodo.';
+    END IF;
 
-        s.sal_inicial,
+    /*
+        Debe y Haber se obtienen de las lineas pertenecientes a asientos
+        aprobados. Borradores y asientos anulados quedan excluidos.
+    */
+    SELECT
+        COUNT(*),
+        COALESCE(SUM(d.mon_debe), 0.00),
+        COALESCE(SUM(d.mon_haber), 0.00)
+    INTO
+        v_cantidad_movimientos,
+        v_tot_debe,
+        v_tot_haber
+    FROM ga_detalle_asiento d
+    INNER JOIN ga_asiento_contable a
+        ON a.cod_asiento = d.cod_asiento
+    WHERE d.cod_cuenta = p_cod_cuenta
+      AND a.cod_periodo = p_cod_periodo
+      AND a.ind_estado = 'aprobado';
 
-        s.tot_debe,
+    IF v_cantidad_movimientos = 0 THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Error: la cuenta no tiene movimientos aprobados en el periodo.';
+    END IF;
 
-        s.tot_haber,
+    /*
+        El saldo inicial proviene del ultimo periodo anterior disponible.
+        Si la cuenta no posee historia, comienza en cero.
+    */
+    SELECT COALESCE((
+        SELECT saldo_anterior.sal_final
+        FROM cm_saldo_cuenta_periodo saldo_anterior
+        INNER JOIN ga_periodo_contable periodo_anterior
+            ON periodo_anterior.cod_periodo = saldo_anterior.cod_periodo
+        WHERE saldo_anterior.cod_cuenta = p_cod_cuenta
+          AND saldo_anterior.ind_estado <> 'inactivo'
+          AND periodo_anterior.fec_fin < v_fec_inicio
+        ORDER BY periodo_anterior.fec_fin DESC, saldo_anterior.cod_saldo DESC
+        LIMIT 1
+    ), 0.00)
+    INTO v_sal_inicial;
 
-        s.sal_final,
+    /* La naturaleza determina que columna aumenta el saldo normal. */
+    IF v_naturaleza = 'deudora' THEN
+        SET v_sal_final = v_sal_inicial + v_tot_debe - v_tot_haber;
+    ELSE
+        SET v_sal_final = v_sal_inicial + v_tot_haber - v_tot_debe;
+    END IF;
 
-        s.ind_estado,
+    /* Se guarda una sola fila resumida por cuenta y periodo. */
+    INSERT INTO cm_saldo_cuenta_periodo (
+        cod_cuenta,
+        cod_periodo,
+        sal_inicial,
+        tot_debe,
+        tot_haber,
+        sal_final,
+        ind_estado,
+        fec_actualizacion
+    ) VALUES (
+        p_cod_cuenta,
+        p_cod_periodo,
+        v_sal_inicial,
+        v_tot_debe,
+        v_tot_haber,
+        v_sal_final,
+        'abierto',
+        NOW()
+    );
 
-        s.fec_actualizacion
-
-    FROM cm_saldo_cuenta_periodo s
-
-    INNER JOIN cc_catalogo_cuenta c
-
-        ON s.cod_cuenta = c.cod_cuenta
-
-    INNER JOIN ga_periodo_contable p
-
-        ON s.cod_periodo = p.cod_periodo
-
-    WHERE (p_cod_saldo IS NULL OR s.cod_saldo = p_cod_saldo)
-
-      AND (p_cod_periodo IS NULL OR s.cod_periodo = p_cod_periodo)
-
-      AND (p_cod_cuenta IS NULL OR s.cod_cuenta = p_cod_cuenta)
-
-      AND (p_ind_estado IS NULL OR s.ind_estado = p_ind_estado)
-
-    ORDER BY s.cod_periodo, c.cod_cuenta;
-
+    SET p_cod_saldo_generado = LAST_INSERT_ID();
+    COMMIT;
 END ;;
 DELIMITER ;
-/*!50003 SET sql_mode              = @saved_sql_mode */ ;
-/*!50003 SET character_set_client  = @saved_cs_client */ ;
-/*!50003 SET character_set_results = @saved_cs_results */ ;
-/*!50003 SET collation_connection  = @saved_col_connection */ ;
-/*!50003 DROP PROCEDURE IF EXISTS `cm_upd_modulo_mayorizacion` */;
-/*!50003 SET @saved_cs_client      = @@character_set_client */ ;
-/*!50003 SET @saved_cs_results     = @@character_set_results */ ;
-/*!50003 SET @saved_col_connection = @@collation_connection */ ;
-/*!50003 SET character_set_client  = utf8mb4 */ ;
-/*!50003 SET character_set_results = utf8mb4 */ ;
-/*!50003 SET collation_connection  = utf8mb4_unicode_ci */ ;
-/*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
-/*!50003 SET sql_mode              = 'NO_ZERO_IN_DATE,NO_ZERO_DATE,NO_ENGINE_SUBSTITUTION' */ ;
+
+DROP PROCEDURE IF EXISTS cm_sel_modulo_mayorizacion;
 DELIMITER ;;
-CREATE PROCEDURE `cm_upd_modulo_mayorizacion`(
-
+CREATE PROCEDURE cm_sel_modulo_mayorizacion(
+    IN p_vista VARCHAR(20),
     IN p_cod_saldo BIGINT,
-
-    IN p_sal_inicial DECIMAL(14,2),
-
-    IN p_tot_debe DECIMAL(14,2),
-
-    IN p_tot_haber DECIMAL(14,2),
-
+    IN p_cod_periodo BIGINT,
+    IN p_cod_cuenta BIGINT,
     IN p_ind_estado VARCHAR(20)
-
 )
 BEGIN
+    /* La vista permite reutilizar el unico procedimiento SELECT del modulo. */
+    DECLARE v_vista VARCHAR(20);
+    DECLARE v_estado VARCHAR(20);
 
-    DECLARE v_estado_actual VARCHAR(20);
+    SET v_vista = LOWER(COALESCE(NULLIF(TRIM(p_vista), ''), 'resumen'));
+    SET v_estado = NULLIF(LOWER(TRIM(p_ind_estado)), '');
 
-    DECLARE v_sal_final DECIMAL(14,2);
-
-
-
-    DECLARE EXIT HANDLER FOR SQLEXCEPTION
-
-    BEGIN
-
-        ROLLBACK;
-
-    END;
-
-
-
-    START TRANSACTION;
-
-
-
-    SELECT ind_estado
-
-    INTO v_estado_actual
-
-    FROM cm_saldo_cuenta_periodo
-
-    WHERE cod_saldo = p_cod_saldo;
-
-
-
-    IF v_estado_actual IS NULL THEN
-
+    IF v_vista NOT IN ('resumen', 'cuenta_t', 'opciones') THEN
         SIGNAL SQLSTATE '45000'
-
-        SET MESSAGE_TEXT = 'Error: el registro de saldo no existe.';
-
+            SET MESSAGE_TEXT = 'Error: la vista solicitada no es valida.';
     END IF;
 
-
-
-    IF v_estado_actual = 'cerrado' THEN
-
+    IF v_estado IS NOT NULL
+       AND v_estado NOT IN ('abierto', 'recalculado', 'cerrado', 'inactivo') THEN
         SIGNAL SQLSTATE '45000'
-
-        SET MESSAGE_TEXT = 'Error: no se pueden modificar saldos de un periodo cerrado.';
-
+            SET MESSAGE_TEXT = 'Error: el estado de saldo no es valido.';
     END IF;
 
+    IF v_vista = 'resumen' THEN
+        /*
+            La consulta general conserva los filtros anteriores. Cuando no se
+            pide un estado concreto, oculta los registros inactivos.
+        */
+        SELECT
+            s.cod_saldo,
+            s.cod_cuenta,
+            c.cod_num_cuenta,
+            c.nom_cuenta,
+            c.ind_naturaleza,
+            s.cod_periodo,
+            p.nom_periodo,
+            p.fec_inicio,
+            p.fec_fin,
+            p.ind_estado AS estado_periodo,
+            s.sal_inicial,
+            s.tot_debe,
+            s.tot_haber,
+            s.sal_final,
+            s.ind_estado,
+            s.fec_actualizacion
+        FROM cm_saldo_cuenta_periodo s
+        INNER JOIN cc_catalogo_cuenta c
+            ON c.cod_cuenta = s.cod_cuenta
+        INNER JOIN ga_periodo_contable p
+            ON p.cod_periodo = s.cod_periodo
+        WHERE (p_cod_saldo IS NULL OR s.cod_saldo = p_cod_saldo)
+          AND (p_cod_periodo IS NULL OR s.cod_periodo = p_cod_periodo)
+          AND (p_cod_cuenta IS NULL OR s.cod_cuenta = p_cod_cuenta)
+          AND (
+                (v_estado IS NULL AND s.ind_estado <> 'inactivo')
+                OR s.ind_estado = v_estado
+          )
+        ORDER BY p.fec_inicio DESC, c.cod_num_cuenta;
 
+    ELSEIF v_vista = 'cuenta_t' THEN
+        /* Una Cuenta T siempre pertenece a una cuenta y a un periodo concretos. */
+        IF p_cod_periodo IS NULL OR p_cod_periodo <= 0
+           OR p_cod_cuenta IS NULL OR p_cod_cuenta <= 0 THEN
+            SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'Error: la Cuenta T requiere una cuenta y un periodo validos.';
+        END IF;
 
-    IF p_ind_estado NOT IN ('abierto', 'cerrado', 'recalculado') THEN
+        IF NOT EXISTS (
+            SELECT 1
+            FROM cm_saldo_cuenta_periodo
+            WHERE cod_cuenta = p_cod_cuenta
+              AND cod_periodo = p_cod_periodo
+              AND ind_estado <> 'inactivo'
+        ) THEN
+            SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'Error: la cuenta todavia no ha sido mayorizada en este periodo.';
+        END IF;
 
-        SIGNAL SQLSTATE '45000'
+        /* Primer conjunto: encabezado y totales de la Cuenta T. */
+        SELECT
+            s.cod_saldo,
+            s.cod_cuenta,
+            c.cod_num_cuenta,
+            c.nom_cuenta,
+            c.ind_naturaleza,
+            s.cod_periodo,
+            p.nom_periodo,
+            p.fec_inicio,
+            p.fec_fin,
+            s.sal_inicial,
+            s.tot_debe,
+            s.tot_haber,
+            s.sal_final,
+            s.ind_estado,
+            s.fec_actualizacion
+        FROM cm_saldo_cuenta_periodo s
+        INNER JOIN cc_catalogo_cuenta c
+            ON c.cod_cuenta = s.cod_cuenta
+        INNER JOIN ga_periodo_contable p
+            ON p.cod_periodo = s.cod_periodo
+        WHERE s.cod_cuenta = p_cod_cuenta
+          AND s.cod_periodo = p_cod_periodo
+          AND s.ind_estado <> 'inactivo';
 
-        SET MESSAGE_TEXT = 'Error: estado de saldo no valido.';
+        /*
+            Segundo conjunto: movimientos individuales. SUM OVER genera el
+            saldo acumulado sin agrupar ni perder ninguna linea del asiento.
+        */
+        SELECT
+            d.cod_detalle_asiento,
+            a.cod_asiento,
+            a.num_asiento,
+            a.fec_asiento,
+            a.tip_asiento,
+            a.des_asiento,
+            d.num_linea,
+            d.des_linea,
+            d.mon_debe,
+            d.mon_haber,
+            s.sal_inicial
+            + SUM(
+                CASE
+                    WHEN c.ind_naturaleza = 'deudora'
+                        THEN d.mon_debe - d.mon_haber
+                    ELSE d.mon_haber - d.mon_debe
+                END
+              ) OVER (
+                ORDER BY a.fec_asiento, a.cod_asiento, d.num_linea
+                ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+              ) AS sal_acumulado
+        FROM ga_detalle_asiento d
+        INNER JOIN ga_asiento_contable a
+            ON a.cod_asiento = d.cod_asiento
+        INNER JOIN cc_catalogo_cuenta c
+            ON c.cod_cuenta = d.cod_cuenta
+        INNER JOIN cm_saldo_cuenta_periodo s
+            ON s.cod_cuenta = d.cod_cuenta
+           AND s.cod_periodo = a.cod_periodo
+        WHERE d.cod_cuenta = p_cod_cuenta
+          AND a.cod_periodo = p_cod_periodo
+          AND a.ind_estado = 'aprobado'
+          AND s.ind_estado <> 'inactivo'
+        ORDER BY a.fec_asiento, a.cod_asiento, d.num_linea;
 
+    ELSE
+        /* Primer conjunto: cuentas validas para los selectores del frontend. */
+        SELECT
+            c.cod_cuenta,
+            c.cod_num_cuenta,
+            c.nom_cuenta,
+            c.ind_naturaleza
+        FROM cc_catalogo_cuenta c
+        WHERE c.ind_estado = 'activo'
+          AND c.ind_acepta_movimiento = 'si'
+        ORDER BY c.cod_num_cuenta;
+
+        /* Segundo conjunto: periodos consultables desde la interfaz. */
+        SELECT
+            p.cod_periodo,
+            p.nom_periodo,
+            p.fec_inicio,
+            p.fec_fin,
+            p.ind_estado
+        FROM ga_periodo_contable p
+        WHERE p.ind_estado <> 'anulado'
+        ORDER BY p.fec_inicio DESC;
     END IF;
-
-
-
-    SET v_sal_final = IFNULL(p_sal_inicial, 0.00)
-
-                    + IFNULL(p_tot_debe, 0.00)
-
-                    - IFNULL(p_tot_haber, 0.00);
-
-
-
-    UPDATE cm_saldo_cuenta_periodo
-
-    SET
-
-        sal_inicial = IFNULL(p_sal_inicial, 0.00),
-
-        tot_debe = IFNULL(p_tot_debe, 0.00),
-
-        tot_haber = IFNULL(p_tot_haber, 0.00),
-
-        sal_final = v_sal_final,
-
-        ind_estado = p_ind_estado,
-
-        fec_actualizacion = NOW()
-
-    WHERE cod_saldo = p_cod_saldo;
-
-
-
-    COMMIT;
-
 END ;;
 DELIMITER ;
-/*!50003 SET sql_mode              = @saved_sql_mode */ ;
-/*!50003 SET character_set_client  = @saved_cs_client */ ;
-/*!50003 SET character_set_results = @saved_cs_results */ ;
-/*!50003 SET collation_connection  = @saved_col_connection */ ;
+
+DROP PROCEDURE IF EXISTS cm_upd_modulo_mayorizacion;
+DELIMITER ;;
+CREATE PROCEDURE cm_upd_modulo_mayorizacion(
+    IN p_cod_saldo BIGINT,
+    IN p_accion VARCHAR(20)
+)
+BEGIN
+    /* Informacion del saldo, de la cuenta y del periodo relacionado. */
+    DECLARE v_cod_cuenta BIGINT;
+    DECLARE v_cod_periodo BIGINT;
+    DECLARE v_estado_actual VARCHAR(20);
+    DECLARE v_naturaleza VARCHAR(20);
+    DECLARE v_estado_cuenta VARCHAR(20);
+    DECLARE v_acepta_movimiento VARCHAR(2);
+    DECLARE v_estado_periodo VARCHAR(20);
+    DECLARE v_fec_inicio DATE;
+    DECLARE v_accion VARCHAR(20);
+
+    /* Importes que se vuelven a obtener desde la fuente contable. */
+    DECLARE v_sal_inicial DECIMAL(14,2) DEFAULT 0.00;
+    DECLARE v_tot_debe DECIMAL(14,2) DEFAULT 0.00;
+    DECLARE v_tot_haber DECIMAL(14,2) DEFAULT 0.00;
+    DECLARE v_sal_final DECIMAL(14,2) DEFAULT 0.00;
+
+    /* Todo error se propaga a la API despues de revertir la transaccion. */
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        ROLLBACK;
+        RESIGNAL;
+    END;
+
+    SET v_accion = NULLIF(LOWER(TRIM(p_accion)), '');
+    START TRANSACTION;
+
+    IF p_cod_saldo IS NULL OR p_cod_saldo <= 0 THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Error: el codigo de saldo es obligatorio y debe ser positivo.';
+    END IF;
+
+    IF v_accion IS NULL
+       OR v_accion NOT IN ('recalcular', 'cerrar', 'inactivar') THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Error: la accion debe ser recalcular, cerrar o inactivar.';
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM cm_saldo_cuenta_periodo
+        WHERE cod_saldo = p_cod_saldo
+    ) THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Error: el registro de saldo no existe.';
+    END IF;
+
+    SELECT
+        s.cod_cuenta,
+        s.cod_periodo,
+        s.ind_estado,
+        c.ind_naturaleza,
+        c.ind_estado,
+        c.ind_acepta_movimiento,
+        p.ind_estado,
+        p.fec_inicio
+    INTO
+        v_cod_cuenta,
+        v_cod_periodo,
+        v_estado_actual,
+        v_naturaleza,
+        v_estado_cuenta,
+        v_acepta_movimiento,
+        v_estado_periodo,
+        v_fec_inicio
+    FROM cm_saldo_cuenta_periodo s
+    INNER JOIN cc_catalogo_cuenta c
+        ON c.cod_cuenta = s.cod_cuenta
+    INNER JOIN ga_periodo_contable p
+        ON p.cod_periodo = s.cod_periodo
+    WHERE s.cod_saldo = p_cod_saldo;
+
+    /* Un saldo cerrado o inactivo no puede volver a modificarse. */
+    IF v_estado_actual = 'cerrado' THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Error: un saldo cerrado ya no puede modificarse.';
+    END IF;
+
+    IF v_estado_actual = 'inactivo' THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Error: un saldo inactivo ya no puede modificarse.';
+    END IF;
+
+    IF v_accion = 'inactivar' THEN
+        /* El soft delete conserva el registro y solo cambia su estado. */
+        UPDATE cm_saldo_cuenta_periodo
+        SET ind_estado = 'inactivo',
+            fec_actualizacion = NOW()
+        WHERE cod_saldo = p_cod_saldo;
+
+    ELSE
+        /* Recalcular o cerrar exige una cuenta de detalle todavia valida. */
+        IF v_estado_cuenta <> 'activo'
+           OR v_acepta_movimiento <> 'si' THEN
+            SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'Error: la cuenta ya no esta activa o no acepta movimientos.';
+        END IF;
+
+        /* Recalcular corresponde a periodos abiertos. */
+        IF v_accion = 'recalcular' AND v_estado_periodo <> 'abierto' THEN
+            SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'Error: solo se pueden recalcular saldos de periodos abiertos.';
+        END IF;
+
+        /*
+            El cierre del saldo solo es seguro cuando el periodo completo ya
+            fue cerrado y no puede recibir nuevos asientos.
+        */
+        IF v_accion = 'cerrar' AND v_estado_periodo <> 'cerrado' THEN
+            SIGNAL SQLSTATE '45000'
+                SET MESSAGE_TEXT = 'Error: cierre primero el periodo contable antes de cerrar el saldo.';
+        END IF;
+
+        /* Los nuevos totales vuelven a salir de los asientos aprobados. */
+        SELECT
+            COALESCE(SUM(d.mon_debe), 0.00),
+            COALESCE(SUM(d.mon_haber), 0.00)
+        INTO
+            v_tot_debe,
+            v_tot_haber
+        FROM ga_detalle_asiento d
+        INNER JOIN ga_asiento_contable a
+            ON a.cod_asiento = d.cod_asiento
+        WHERE d.cod_cuenta = v_cod_cuenta
+          AND a.cod_periodo = v_cod_periodo
+          AND a.ind_estado = 'aprobado';
+
+        /* El saldo inicial se sincroniza con el ultimo periodo anterior. */
+        SELECT COALESCE((
+            SELECT saldo_anterior.sal_final
+            FROM cm_saldo_cuenta_periodo saldo_anterior
+            INNER JOIN ga_periodo_contable periodo_anterior
+                ON periodo_anterior.cod_periodo = saldo_anterior.cod_periodo
+            WHERE saldo_anterior.cod_cuenta = v_cod_cuenta
+              AND saldo_anterior.ind_estado <> 'inactivo'
+              AND periodo_anterior.fec_fin < v_fec_inicio
+            ORDER BY periodo_anterior.fec_fin DESC, saldo_anterior.cod_saldo DESC
+            LIMIT 1
+        ), 0.00)
+        INTO v_sal_inicial;
+
+        /* Se aplica la formula correspondiente a la naturaleza de la cuenta. */
+        IF v_naturaleza = 'deudora' THEN
+            SET v_sal_final = v_sal_inicial + v_tot_debe - v_tot_haber;
+        ELSE
+            SET v_sal_final = v_sal_inicial + v_tot_haber - v_tot_debe;
+        END IF;
+
+        UPDATE cm_saldo_cuenta_periodo
+        SET sal_inicial = v_sal_inicial,
+            tot_debe = v_tot_debe,
+            tot_haber = v_tot_haber,
+            sal_final = v_sal_final,
+            ind_estado = IF(v_accion = 'cerrar', 'cerrado', 'recalculado'),
+            fec_actualizacion = NOW()
+        WHERE cod_saldo = p_cod_saldo;
+    END IF;
+
+    COMMIT;
+END ;;
+DELIMITER ;
 /*!50003 DROP PROCEDURE IF EXISTS `ga_ins_modulo_asientos` */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
