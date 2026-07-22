@@ -7,16 +7,8 @@
 @extends('adminlte::page')
 
 @php
-    /*
-     * Recuperamos únicamente la información pública del usuario.
-     * El token nunca se imprime en la página.
-     */
     $usuarioPinax = session('pinax_user', []);
 
-    /*
-     * Usamos diferentes alternativas porque el nombre exacto puede
-     * depender de cómo esté construida la respuesta de la API.
-     */
     $nombreUsuario = data_get($usuarioPinax, 'firstname')
         ?? data_get($usuarioPinax, 'name')
         ?? data_get($usuarioPinax, 'NAME')
@@ -31,7 +23,6 @@
 {{-- Elementos del lado derecho de la barra superior de AdminLTE. --}}
 @section('content_top_nav_right')
 
-    {{-- Información del usuario autenticado. --}}
     <li class="nav-item d-none d-md-flex align-items-center">
         <div class="pinax-navbar-user">
             <span class="pinax-navbar-avatar">
@@ -45,7 +36,6 @@
         </div>
     </li>
 
-    {{-- Formulario seguro para cerrar sesión. --}}
     <li class="nav-item d-flex align-items-center">
         <form
             action="{{ route('logout') }}"
@@ -65,5 +55,72 @@
             </button>
         </form>
     </li>
+
+@stop
+
+{{-- MENÚ LATERAL DE ADMINLTE --}}
+@section('adminlte_sidebar_menu')
+
+    <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu" data-accordion="false">
+
+        <li class="nav-header">NAVEGACIÓN</li>
+
+        <li class="nav-item">
+            <a href="{{ route('dashboard') }}" class="nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}">
+                <i class="nav-icon fas fa-tachometer-alt"></i>
+                <p>Dashboard</p>
+            </a>
+        </li>
+
+        <li class="nav-header">GESTIÓN</li>
+
+        <li class="nav-item">
+            <a href="{{ route('personas.index') }}" class="nav-link {{ request()->routeIs('personas.*') ? 'active' : '' }}">
+                <i class="nav-icon fas fa-users"></i>
+                <p>Personas</p>
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a href="{{ route('usuarios.index') }}" class="nav-link {{ request()->routeIs('usuarios.*') ? 'active' : '' }}">
+                <i class="nav-icon fas fa-user-cog"></i>
+                <p>Usuarios</p>
+            </a>
+        </li>
+
+        <li class="nav-header">CONTABILIDAD</li>
+
+        <li class="nav-item">
+            <a href="#" class="nav-link">
+                <i class="nav-icon fas fa-book"></i>
+                <p>Catálogo de cuentas</p>
+                <span class="badge badge-info right">Próximo</span>
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a href="#" class="nav-link">
+                <i class="nav-icon fas fa-file-invoice"></i>
+                <p>Asientos contables</p>
+                <span class="badge badge-info right">Próximo</span>
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a href="#" class="nav-link">
+                <i class="nav-icon fas fa-calculator"></i>
+                <p>Mayorización</p>
+                <span class="badge badge-info right">Próximo</span>
+            </a>
+        </li>
+
+        <li class="nav-item">
+            <a href="{{ route('reportes.index') }}" class="nav-link {{ request()->routeIs('reportes.*') ? 'active' : '' }}">
+                <i class="nav-icon fas fa-chart-pie"></i>
+                <p>Reportes Financieros</p>
+            </a>
+        </li>
+
+    </ul>
 
 @stop

@@ -95,11 +95,7 @@ const convertirBooleanoBody = (valor) => {
 
     Funcion:
     - consulta reportes financieros.
-    - permite filtrar por cod_reporte.
-    - permite filtrar por cod_periodo.
-    - permite filtrar por tip_reporte.
-    - permite filtrar por ind_estado.
-    - permite filtrar por cod_user.
+    - permite filtrar por cod_reporte, cod_periodo, tip_reporte, ind_estado y cod_user.
     - permite incluir detalle cuando se consulta un reporte especifico.
 
     Metodo HTTP:
@@ -229,24 +225,49 @@ const obtenerReportesFinancieros = async (req, res) => {
         const detalle = incluirDetalleParam ? (resultado[1] || []) : undefined;
 
         /*
-            Validacion de balance general.
-
-            Si alguno de los reportes de tipo balance_general viene descuadrado,
-            marcamos balance_valido como false.
+            ✅ VALIDACION DE BALANCE GENERAL (CORREGIDA)
+            - Sin usar estado_validacion
+            - Verifica si Activo = Pasivo + Patrimonio
+            - Soporta tanto 'tip_reporte' como 'tp_reporte'
         */
         let balanceValido = true;
         let mensajeValidacion = 'Consulta realizada correctamente';
 
+        // Función para verificar si un balance está cuadrado
+        const verificarBalanceCuadrado = (reporte) => {
+            // Usar tip_reporte o tp_reporte (cualquiera que venga del SP)
+            const tipoReporte = reporte.tip_reporte || reporte.tp_reporte;
+            
+            if (tipoReporte !== 'balance_general') return true;
+            
+            const activo = parseFloat(reporte.tot_activo) || 0;
+            const pasivo = parseFloat(reporte.tot_pasivo) || 0;
+            const patrimonio = parseFloat(reporte.tot_patrimonio) || 0;
+            
+            // Si la diferencia es mayor a 0.01, consideramos descuadrado
+            return Math.abs(activo - (pasivo + patrimonio)) <= 0.01;
+        };
+
+        // Filtrar balances descuadrados
         const balancesDescuadrados = cabecera.filter((reporte) => {
-            return reporte.tip_reporte === 'balance_general' &&
-                   reporte.estado_validacion === 'balance descuadrado';
+            const tipoReporte = reporte.tip_reporte || reporte.tp_reporte;
+            return tipoReporte === 'balance_general' &&
+                   !verificarBalanceCuadrado(reporte);
         });
 
         if (balancesDescuadrados.length > 0) {
             balanceValido = false;
             mensajeValidacion = 'Uno o mas balances generales presentan inconsistencias contables';
-        } else if (cabecera.some((reporte) => reporte.tip_reporte === 'balance_general')) {
-            mensajeValidacion = 'Todos los balances generales consultados estan cuadrados';
+        } else {
+            // Verificar si hay algún balance general
+            const hayBalanceGeneral = cabecera.some((reporte) => {
+                const tipoReporte = reporte.tip_reporte || reporte.tp_reporte;
+                return tipoReporte === 'balance_general';
+            });
+            
+            if (hayBalanceGeneral) {
+                mensajeValidacion = 'Todos los balances generales consultados estan cuadrados';
+            }
         }
 
         // Construimos la respuesta base.
@@ -804,8 +825,6 @@ const actualizarReporteFinanciero = async (req, res) => {
     Ruta esperada:
     - GET /api/reportes/:cod_reporte/detalle
 */
-
-
 const obtenerDetalleReporte = async (req, res) => {
     try {
         // Extraemos el codigo del reporte desde la URL.
@@ -883,7 +902,7 @@ const obtenerDetalleReporte = async (req, res) => {
         return res.status(200).json({
             estado: 'ok',
             cod_reporte: codReporte,
-            tip_reporte: cabecera[0].tip_reporte,
+            tip_reporte: cabecera[0].tip_reporte || cabecera[0].tp_reporte,
             ind_estado: cabecera[0].ind_estado,
             total_lineas: detalle.length,
             detalle: detalle
@@ -914,7 +933,6 @@ const obtenerDetalleReporte = async (req, res) => {
         });
     }
 };
-
 
 // Exportamos los metodos del controlador de reportes financieros.
 module.exports = {
