@@ -76,3 +76,16 @@ Route::middleware(EnsurePinaxAuthenticated::class)->group(function () {
         ->whereNumber('codPeople')
         ->name('personas.toggle-status');
 });
+
+/*
+|--------------------------------------------------------------------------
+| ASIENTOS
+|--------------------------------------------------------------------------
+*/
+
+use App\Http\Controllers\AsientosContablesController;
+
+Route::middleware(['auth.pinax'])->group(function () {
+
+Route::resource('asientos-contables', AsientosContablesController::class);
+});
