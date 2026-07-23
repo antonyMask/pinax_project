@@ -293,10 +293,9 @@ return [
         ],
         [
             'text' => 'Asientos contables',
-            'url' => '#',
+            'route' => 'asientos-contables.index',
             'icon' => 'fas fa-fw fa-file-invoice-dollar',
-            'label' => 'Próximo',
-            'label_color' => 'info',
+            'active' => ['asientos-contables*'],
         ],
         [
             'text' => 'Mayorización',
