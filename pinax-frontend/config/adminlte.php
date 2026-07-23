@@ -284,10 +284,19 @@ return [
         ],
         [
             'text' => 'Catálogo de cuentas',
-            'url' => '#',
             'icon' => 'fas fa-fw fa-sitemap',
-            'label' => 'Próximo',
-            'label_color' => 'info',
+            'submenu' => [
+                [
+                    'text' => 'Listado de cuentas',
+                    'route' => 'catalogo.index',
+                    'icon' => 'fas fa-fw fa-list',
+                ],
+                [
+                    'text' => 'Registrar cuenta',
+                    'route' => 'catalogo.create',
+                    'icon' => 'fas fa-fw fa-plus',
+                ],
+            ],
         ],
         [
             'text' => 'Asientos contables',

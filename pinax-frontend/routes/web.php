@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CatalogoController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\MayorizacionController;
 use App\Http\Controllers\PersonaController;
@@ -199,4 +200,39 @@ Route::middleware(EnsurePinaxAuthenticated::class)->group(function () {
         ->whereNumber('cod_saldo')
         ->name('mayorizacion.update');
 
+    /*
+    |--------------------------------------------------------------------------
+    | Catálogo de cuentas
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get('/catalogo', [CatalogoController::class, 'index'])
+        ->name('catalogo.index');
+
+    Route::get('/catalogo/crear', [CatalogoController::class, 'create'])
+        ->name('catalogo.create');
+
+    Route::post('/catalogo', [CatalogoController::class, 'store'])
+        ->name('catalogo.store');
+
+    Route::get(
+        '/catalogo/{codCuenta}/editar',
+        [CatalogoController::class, 'edit']
+    )
+        ->whereNumber('codCuenta')
+        ->name('catalogo.edit');
+
+    Route::put(
+        '/catalogo/{codCuenta}',
+        [CatalogoController::class, 'update']
+    )
+        ->whereNumber('codCuenta')
+        ->name('catalogo.update');
+
+    Route::patch(
+        '/catalogo/{codCuenta}/estado',
+        [CatalogoController::class, 'toggleStatus']
+    )
+        ->whereNumber('codCuenta')
+        ->name('catalogo.toggle-status');
 });
