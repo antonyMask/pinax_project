@@ -4,7 +4,6 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\MayorizacionController;
 use App\Http\Controllers\PersonaController;
-use App\Http\Controllers\UsuarioController;
 use App\Http\Controllers\ReporteFinancieroController;
 use App\Http\Middleware\EnsurePinaxAuthenticated;
 use Illuminate\Support\Facades\Route;
@@ -134,44 +133,6 @@ Route::middleware(EnsurePinaxAuthenticated::class)->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Usuarios
-    |--------------------------------------------------------------------------
-    */
-
-    // Listar usuarios
-    Route::get('/usuarios', [UsuarioController::class, 'index'])
-        ->name('usuarios.index');
-
-    // Formulario para crear usuario
-    Route::get('/usuarios/crear', [UsuarioController::class, 'create'])
-        ->name('usuarios.create');
-
-    // Guardar nuevo usuario
-    Route::post('/usuarios', [UsuarioController::class, 'store'])
-        ->name('usuarios.store');
-
-    // Ver detalle de un usuario
-    Route::get('/usuarios/{id}', [UsuarioController::class, 'show'])
-        ->whereNumber('id')
-        ->name('usuarios.show');
-
-    // Formulario para editar usuario
-    Route::get('/usuarios/{id}/editar', [UsuarioController::class, 'edit'])
-        ->whereNumber('id')
-        ->name('usuarios.edit');
-
-    // Actualizar usuario
-    Route::put('/usuarios/{id}', [UsuarioController::class, 'update'])
-        ->whereNumber('id')
-        ->name('usuarios.update');
-
-    // Cambiar estado del usuario (activar/desactivar)
-    Route::patch('/usuarios/{id}/estado', [UsuarioController::class, 'toggleStatus'])
-        ->whereNumber('id')
-        ->name('usuarios.toggle-status');
-
-    /*
-    |--------------------------------------------------------------------------
     | Reportes Financieros
     |--------------------------------------------------------------------------
     */
@@ -208,7 +169,7 @@ Route::middleware(EnsurePinaxAuthenticated::class)->group(function () {
         ->whereNumber('id')
         ->name('reportes.destroy');
 
-        /*
+    /*
     |--------------------------------------------------------------------------
     | Cuentas T y Mayorización
     |--------------------------------------------------------------------------
@@ -238,5 +199,4 @@ Route::middleware(EnsurePinaxAuthenticated::class)->group(function () {
         ->whereNumber('cod_saldo')
         ->name('mayorizacion.update');
 
-    
 });

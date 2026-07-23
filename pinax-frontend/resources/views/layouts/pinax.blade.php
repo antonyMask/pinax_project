@@ -81,13 +81,6 @@
             </a>
         </li>
 
-        <li class="nav-item">
-            <a href="{{ route('usuarios.index') }}" class="nav-link {{ request()->routeIs('usuarios.*') ? 'active' : '' }}">
-                <i class="nav-icon fas fa-user-cog"></i>
-                <p>Usuarios</p>
-            </a>
-        </li>
-
         <li class="nav-header">CONTABILIDAD</li>
 
         <li class="nav-item">
