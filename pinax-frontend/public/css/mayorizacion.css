@@ -1,0 +1,1632 @@
+/*
+|--------------------------------------------------------------------------
+| Cuentas T y MayorizaciÃ³n
+|--------------------------------------------------------------------------
+| El mÃ³dulo adopta la estructura visual de un libro mayor: lÃ­neas de registro,
+| separaciÃ³n Debe/Haber y nÃºmeros tabulares. Reutiliza los tokens de Pinax.
+*/
+
+/* Encabezado principal con la Cuenta T como firma visual del mÃ³dulo. */
+.mayor-hero {
+    position: relative;
+    display: grid;
+    min-height: 280px;
+    margin-bottom: 24px;
+    padding: 40px 46px;
+    overflow: hidden;
+    color: #f4f7ff;
+    background:
+        linear-gradient(rgba(85, 220, 255, 0.055) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(85, 220, 255, 0.045) 1px, transparent 1px),
+        radial-gradient(circle at 84% 18%, rgba(85, 220, 255, 0.18), transparent 25%),
+        radial-gradient(circle at 58% 112%, rgba(176, 36, 203, 0.2), transparent 35%),
+        linear-gradient(125deg, #040617 0%, #0c1137 50%, #171354 100%);
+    background-size: 38px 38px, 38px 38px, auto, auto, auto;
+    border: 1px solid rgba(85, 220, 255, 0.17);
+    border-radius: 22px;
+    box-shadow: 0 24px 55px rgba(5, 7, 30, 0.2);
+    grid-template-columns: minmax(0, 1fr) 320px;
+}
+
+.mayor-hero::after {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 46%;
+    height: 4px;
+    content: "";
+    background: linear-gradient(90deg, transparent, var(--pinax-cyan));
+}
+
+.mayor-hero__content {
+    position: relative;
+    z-index: 2;
+    align-self: center;
+    max-width: 700px;
+}
+
+.mayor-eyebrow,
+.mayor-panel__kicker {
+    display: block;
+    color: var(--pinax-cyan);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.17em;
+    text-transform: uppercase;
+}
+
+.mayor-hero h1 {
+    margin: 8px 0 14px;
+    font-family: Bahnschrift, "Segoe UI", sans-serif;
+    font-size: clamp(2.2rem, 4.2vw, 4rem);
+    font-weight: 700;
+    line-height: 0.98;
+    letter-spacing: -0.045em;
+}
+
+.mayor-hero h1 span {
+    display: block;
+    color: transparent;
+    background: linear-gradient(90deg, var(--pinax-cyan), #9faaff, #e168ff);
+    background-clip: text;
+    -webkit-background-clip: text;
+}
+
+.mayor-hero p {
+    max-width: 630px;
+    margin-bottom: 22px;
+    color: #c5cbe0;
+    font-size: 1rem;
+    line-height: 1.65;
+}
+
+.mayor-hero__action {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding: 10px 15px;
+    color: #f7f9ff;
+    font-size: 0.84rem;
+    font-weight: 700;
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+    backdrop-filter: blur(8px);
+    transition:
+        background-color 180ms ease,
+        border-color 180ms ease,
+        transform 180ms ease;
+}
+
+.mayor-hero__action:hover {
+    color: #fff;
+    text-decoration: none;
+    background: rgba(85, 220, 255, 0.13);
+    border-color: rgba(85, 220, 255, 0.45);
+    transform: translateY(-2px);
+}
+
+.mayor-hero__action:focus-visible {
+    outline: 3px solid rgba(85, 220, 255, 0.45);
+    outline-offset: 3px;
+}
+
+/* RepresentaciÃ³n abstracta de Debe/Haber sin introducir datos simulados. */
+.mayor-t-account {
+    position: relative;
+    z-index: 1;
+    align-self: center;
+    width: 280px;
+    padding: 22px 18px 18px;
+    justify-self: end;
+}
+
+.mayor-t-account__title {
+    display: block;
+    margin-bottom: 16px;
+    color: rgba(255, 255, 255, 0.42);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+.mayor-t-account__labels,
+.mayor-t-account__values {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+}
+
+.mayor-t-account__labels span {
+    padding: 0 18px 11px;
+    color: #e9ecff;
+    font-family: Bahnschrift, "Segoe UI", sans-serif;
+    font-size: 0.86rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+.mayor-t-account__rule {
+    position: relative;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--pinax-cyan), transparent);
+    box-shadow: 0 0 18px rgba(85, 220, 255, 0.45);
+}
+
+.mayor-t-account__rule::after {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 2px;
+    height: 74px;
+    content: "";
+    background: linear-gradient(var(--pinax-cyan), transparent);
+}
+
+.mayor-t-account__values span {
+    padding: 18px;
+    color: rgba(255, 255, 255, 0.18);
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 2.4rem;
+    font-weight: 700;
+    text-align: center;
+}
+
+/* Mensajes de resultado y validaciÃ³n. */
+.mayor-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 13px;
+    margin-bottom: 20px;
+    padding: 15px 18px;
+    border: 0;
+    border-radius: 14px;
+    box-shadow: var(--pinax-shadow);
+}
+
+.mayor-alert > i {
+    margin-top: 3px;
+    font-size: 1.1rem;
+}
+
+.mayor-alert strong,
+.mayor-alert span {
+    display: block;
+}
+
+.mayor-alert strong {
+    margin-bottom: 2px;
+}
+
+/* MÃ©tricas compactas con un cÃ³digo cromÃ¡tico contable. */
+.mayor-metrics > div {
+    margin-bottom: 24px;
+}
+
+.mayor-metric {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 124px;
+    height: 100%;
+    padding: 21px;
+    overflow: hidden;
+    background: #fff;
+    border: 1px solid var(--pinax-border);
+    border-radius: 17px;
+    box-shadow: var(--pinax-shadow);
+    transition:
+        box-shadow 180ms ease,
+        transform 180ms ease;
+}
+
+.mayor-metric::before {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 4px;
+    content: "";
+    background: var(--mayor-accent);
+}
+
+.mayor-metric:hover {
+    box-shadow: 0 18px 40px rgba(20, 28, 72, 0.13);
+    transform: translateY(-3px);
+}
+
+.mayor-metric--total {
+    --mayor-accent: #1a99f7;
+    --mayor-soft: rgba(26, 153, 247, 0.12);
+}
+
+.mayor-metric--open {
+    --mayor-accent: #16a6c9;
+    --mayor-soft: rgba(22, 166, 201, 0.12);
+}
+
+.mayor-metric--recalculated {
+    --mayor-accent: #d58b17;
+    --mayor-soft: rgba(213, 139, 23, 0.13);
+}
+
+.mayor-metric--closed {
+    --mayor-accent: #1f9d6c;
+    --mayor-soft: rgba(31, 157, 108, 0.12);
+}
+
+.mayor-metric__icon {
+    display: grid;
+    flex: 0 0 50px;
+    width: 50px;
+    height: 50px;
+    margin-right: 15px;
+    color: var(--mayor-accent);
+    font-size: 1.18rem;
+    background: var(--mayor-soft);
+    border-radius: 14px;
+    place-items: center;
+}
+
+.mayor-metric__label {
+    display: block;
+    color: #747b91;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.mayor-metric strong {
+    display: block;
+    margin: 2px 0;
+    color: #171b35;
+    font-family: Bahnschrift, "Segoe UI", sans-serif;
+    font-size: 1.8rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.05;
+}
+
+.mayor-metric small {
+    color: #9297aa;
+}
+
+/* Paneles de generaciÃ³n y filtros. */
+.mayor-workspace > div {
+    display: flex;
+    margin-bottom: 24px;
+}
+
+.mayor-panel {
+    width: 100%;
+    padding: 25px;
+    background: #fff;
+    border: 1px solid var(--pinax-border);
+    border-radius: 18px;
+    box-shadow: var(--pinax-shadow);
+}
+
+.mayor-create-panel {
+    scroll-margin-top: 82px;
+    background:
+        linear-gradient(135deg, rgba(26, 153, 247, 0.055), transparent 40%),
+        #fff;
+    border-top: 4px solid var(--pinax-violet);
+}
+
+.mayor-panel__heading,
+.mayor-ledger__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+}
+
+.mayor-panel__kicker {
+    margin-bottom: 5px;
+    color: var(--pinax-violet);
+}
+
+.mayor-panel h2,
+.mayor-ledger h2 {
+    margin: 0;
+    color: #171b35;
+    font-family: Bahnschrift, "Segoe UI", sans-serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.mayor-panel__heading > i {
+    color: var(--pinax-blue);
+    font-size: 1.15rem;
+}
+
+.mayor-panel__step {
+    display: grid;
+    width: 42px;
+    height: 42px;
+    color: #fff;
+    font-family: Bahnschrift, "Segoe UI", sans-serif;
+    font-size: 1.4rem;
+    background: linear-gradient(135deg, var(--pinax-violet), var(--pinax-blue));
+    border-radius: 13px;
+    box-shadow: 0 9px 20px rgba(105, 72, 232, 0.22);
+    place-items: center;
+}
+
+.mayor-panel__intro {
+    margin: -4px 0 18px;
+    color: #747b91;
+    line-height: 1.55;
+}
+
+.mayor-panel label {
+    color: #343950;
+    font-size: 0.81rem;
+    font-weight: 700;
+}
+
+.mayor-panel .form-control {
+    min-height: 44px;
+    color: #282d45;
+    background-color: #fbfcff;
+    border: 1px solid #dfe3ee;
+    border-radius: 10px;
+    transition:
+        background-color 160ms ease,
+        border-color 160ms ease,
+        box-shadow 160ms ease;
+}
+
+.mayor-panel .form-control:focus {
+    background: #fff;
+    border-color: rgba(26, 153, 247, 0.72);
+    box-shadow: 0 0 0 3px rgba(26, 153, 247, 0.12);
+}
+
+.mayor-panel .form-text {
+    line-height: 1.4;
+}
+
+.mayor-inline-note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+    padding: 10px 12px;
+    color: #6e5a20;
+    font-size: 0.8rem;
+    background: #fff8e5;
+    border: 1px solid #f3dfaa;
+    border-radius: 10px;
+}
+
+.mayor-primary-button,
+.mayor-secondary-button,
+.mayor-text-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 42px;
+    padding: 9px 15px;
+    font-size: 0.83rem;
+    font-weight: 700;
+    border-radius: 10px;
+    transition:
+        box-shadow 180ms ease,
+        transform 180ms ease;
+}
+
+.mayor-primary-button {
+    width: 100%;
+    color: #fff;
+    background: linear-gradient(110deg, var(--pinax-violet), var(--pinax-blue));
+    border: 0;
+    box-shadow: 0 10px 22px rgba(58, 94, 221, 0.21);
+}
+
+.mayor-primary-button:hover:not(:disabled),
+.mayor-secondary-button:hover,
+.mayor-text-button:hover {
+    transform: translateY(-2px);
+}
+
+.mayor-primary-button:disabled {
+    cursor: not-allowed;
+    filter: grayscale(0.6);
+    opacity: 0.58;
+}
+
+.mayor-secondary-button {
+    color: #fff;
+    background: #20265a;
+    border: 1px solid #20265a;
+}
+
+.mayor-secondary-button:hover {
+    color: #fff;
+    box-shadow: 0 9px 18px rgba(32, 38, 90, 0.18);
+}
+
+.mayor-text-button {
+    color: #626a82;
+    background: transparent;
+    border: 1px solid #dfe3ee;
+}
+
+.mayor-text-button:hover {
+    color: var(--pinax-blue);
+    text-decoration: none;
+    border-color: rgba(26, 153, 247, 0.4);
+}
+
+.mayor-filter-actions {
+    display: flex;
+    gap: 9px;
+    margin-top: 2px;
+}
+
+/* Tabla densa, legible y visualmente ligada a un libro mayor. */
+.mayor-ledger {
+    margin-bottom: 28px;
+    overflow: hidden;
+    background: #fff;
+    border: 1px solid var(--pinax-border);
+    border-radius: 18px;
+    box-shadow: var(--pinax-shadow);
+}
+
+.mayor-ledger__header {
+    margin: 0;
+    padding: 22px 25px 18px;
+    border-bottom: 1px solid var(--pinax-border);
+}
+
+.mayor-ledger__count {
+    padding: 7px 11px;
+    color: #576079;
+    font-size: 0.76rem;
+    font-weight: 700;
+    background: #f3f5fb;
+    border-radius: 999px;
+}
+
+.mayor-ledger__table {
+    min-width: 1320px;
+    margin-bottom: 0;
+}
+
+.mayor-ledger__table thead th {
+    padding: 12px 13px;
+    color: #747b91;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.07em;
+    vertical-align: middle;
+    background: #f8f9fd;
+    border-top: 0;
+    border-bottom: 1px solid #dfe3ee;
+    text-transform: uppercase;
+}
+
+.mayor-ledger__table tbody td {
+    padding: 14px 13px;
+    color: #343950;
+    vertical-align: middle;
+    border-top: 1px solid #edf0f6;
+}
+
+.mayor-ledger__table tbody tr {
+    transition: background-color 160ms ease;
+}
+
+.mayor-ledger__table tbody tr:hover {
+    background: #fafbff;
+}
+
+.mayor-ledger__debit {
+    background-color: rgba(26, 153, 247, 0.025);
+    border-left: 2px solid rgba(26, 153, 247, 0.13) !important;
+}
+
+.mayor-ledger__credit {
+    background-color: rgba(176, 36, 203, 0.022);
+    border-right: 2px solid rgba(176, 36, 203, 0.11) !important;
+}
+
+.mayor-ledger__id {
+    color: var(--pinax-violet);
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.mayor-ledger__account strong,
+.mayor-ledger__account span {
+    display: block;
+}
+
+.mayor-ledger__account strong {
+    color: #1d2340;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 0.86rem;
+}
+
+.mayor-ledger__account span {
+    max-width: 200px;
+    margin-top: 2px;
+    color: #7b8297;
+    font-size: 0.76rem;
+    line-height: 1.35;
+}
+
+.mayor-money {
+    color: #353b52;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 0.78rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.mayor-money--final {
+    color: #171d3d !important;
+    font-weight: 800;
+}
+
+.mayor-ledger__date {
+    color: #7f8598 !important;
+    font-size: 0.74rem;
+}
+
+.mayor-period,
+.mayor-status,
+.mayor-locked {
+    display: inline-flex;
+    align-items: center;
+    width: max-content;
+    font-size: 0.67rem;
+    font-weight: 800;
+    letter-spacing: 0.025em;
+    border-radius: 999px;
+}
+
+.mayor-period {
+    margin-top: 5px;
+    padding: 3px 7px;
+}
+
+.mayor-period--open {
+    color: #08778f;
+    background: #e7f9fc;
+}
+
+.mayor-period--closed {
+    color: #537060;
+    background: #edf4f0;
+}
+
+.mayor-period--neutral {
+    color: #6f7588;
+    background: #eff1f6;
+}
+
+.mayor-status {
+    padding: 5px 9px;
+    text-transform: uppercase;
+}
+
+.mayor-status--open {
+    color: #087d96;
+    background: #e4f9fd;
+}
+
+.mayor-status--recalculated {
+    color: #9a6208;
+    background: #fff3d9;
+}
+
+.mayor-status--closed {
+    color: #15724d;
+    background: #e6f7ef;
+}
+
+.mayor-status--inactive,
+.mayor-status--neutral {
+    color: #687084;
+    background: #edf0f5;
+}
+
+.mayor-actions-cell {
+    min-width: 138px;
+    text-align: center;
+}
+
+.mayor-row-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.mayor-row-actions form {
+    margin: 0;
+}
+
+.mayor-action {
+    display: inline-grid;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 9px;
+    cursor: pointer;
+    place-items: center;
+    transition:
+        box-shadow 160ms ease,
+        transform 160ms ease;
+}
+
+.mayor-action--recalculate {
+    color: #087d96;
+    background: #e7f9fc;
+    border-color: #c9edf4;
+}
+
+.mayor-action--close {
+    color: #16744f;
+    background: #e8f7ef;
+    border-color: #ccebdc;
+}
+
+.mayor-action--inactivate {
+    color: #ad3347;
+    background: #fff0f2;
+    border-color: #f3d2d8;
+}
+
+.mayor-action:hover:not(:disabled) {
+    box-shadow: 0 7px 14px rgba(30, 38, 78, 0.11);
+    transform: translateY(-2px);
+}
+
+.mayor-action:focus-visible,
+.mayor-primary-button:focus-visible,
+.mayor-secondary-button:focus-visible,
+.mayor-text-button:focus-visible {
+    outline: 3px solid rgba(26, 153, 247, 0.3);
+    outline-offset: 2px;
+}
+
+.mayor-action:disabled {
+    cursor: not-allowed;
+    filter: grayscale(0.8);
+    opacity: 0.35;
+}
+
+.mayor-locked {
+    gap: 5px;
+    padding: 6px 8px;
+    color: #697084;
+    background: #eff1f5;
+}
+
+.mayor-empty-state {
+    padding: 58px 20px !important;
+    color: #858ca0 !important;
+    text-align: center;
+}
+
+.mayor-empty-state i,
+.mayor-empty-state strong,
+.mayor-empty-state span {
+    display: block;
+}
+
+.mayor-empty-state i {
+    margin-bottom: 10px;
+    color: var(--pinax-blue);
+    font-size: 2rem;
+}
+
+.mayor-empty-state strong {
+    margin-bottom: 4px;
+    color: #343950;
+    font-size: 1rem;
+}
+
+.mayor-actions-legend {
+    display: flex;
+    justify-content: flex-end;
+    gap: 16px;
+    padding: 12px 20px;
+    color: #7c8397;
+    font-size: 0.72rem;
+    background: #fafbfe;
+    border-top: 1px solid #edf0f6;
+}
+
+.mayor-actions-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* En tabletas la firma se atenÃºa para conservar el protagonismo del contenido. */
+@media (max-width: 991.98px) {
+    .mayor-hero {
+        padding: 36px 30px;
+        grid-template-columns: minmax(0, 1fr) 210px;
+    }
+
+    .mayor-t-account {
+        width: 210px;
+        opacity: 0.55;
+    }
+}
+
+/* En telÃ©fonos la estructura se convierte en una sola columna legible. */
+@media (max-width: 767.98px) {
+    .mayor-hero {
+        min-height: auto;
+        padding: 31px 24px;
+        border-radius: 17px;
+        grid-template-columns: 1fr;
+    }
+
+    .mayor-hero h1 {
+        font-size: 2.35rem;
+    }
+
+    .mayor-t-account {
+        position: absolute;
+        right: -65px;
+        bottom: 2px;
+        width: 220px;
+        opacity: 0.13;
+    }
+
+    .mayor-panel,
+    .mayor-ledger__header {
+        padding-right: 19px;
+        padding-left: 19px;
+    }
+
+    .mayor-filter-actions,
+    .mayor-actions-legend {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .mayor-filter-actions > * {
+        width: 100%;
+    }
+
+    .mayor-actions-legend {
+        gap: 7px;
+    }
+}
+
+/* Se eliminan movimientos cuando el sistema operativo solicita reducirlos. */
+@media (prefers-reduced-motion: reduce) {
+    .mayor-hero__action,
+    .mayor-metric,
+    .mayor-primary-button,
+    .mayor-secondary-button,
+    .mayor-text-button,
+    .mayor-ledger__table tbody tr,
+    .mayor-action {
+        transition: none;
+    }
+}
+
+/* ==========================================================
+   DETALLE DE CUENTA T
+   Estos estilos complementan la vista show.blade.php.
+   ========================================================== */
+
+/* Navegación superior de la página de detalle. */
+.mayor-detail-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+
+
+/* Enlace para regresar al resumen de mayorizaciones. */
+
+/* Identificador del saldo mostrado al extremo derecho. */
+.mayor-detail-nav > span {
+    padding: 0.45rem 0.8rem;
+    margin-top: 16px;
+    border: 1px solid #ddd6fe;
+    border-radius: 999px;
+    background: #f5f3ff;
+    color: #6d28d9;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+}
+
+.mayor-detail-back {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 50px;
+    padding: 9px 15px;
+    margin-top: 16px;
+    border: 1px solid #dce2ef;
+    border-radius: 12px;
+    background: #ffffff;
+    color: #303b5c;
+    box-shadow: 0 5px 14px rgba(15, 23, 42, 0.07);
+    font-size: 0.82rem;
+    font-weight: 800;
+    line-height: 1;
+    text-decoration: none;
+    transition:
+        color 160ms ease,
+        background-color 160ms ease,
+        border-color 160ms ease,
+        box-shadow 160ms ease,
+        transform 160ms ease;
+}
+
+/* Proporciona retroalimentación visual al usuario del mouse. */
+.mayor-detail-back:hover {
+    border-color: var(--pinax-blue);
+    background: var(--pinax-blue);
+    color: #ffffff;
+    box-shadow: 0 8px 18px rgba(26, 153, 247, 0.22);
+    text-decoration: none;
+    transform: translateX(-3px);
+}
+
+/* Mantiene visible el enfoque para navegación mediante teclado. */
+.mayor-detail-back:focus-visible {
+    outline: 3px solid rgba(26, 153, 247, 0.3);
+    outline-offset: 3px;
+}
+
+/* Refuerza visualmente la dirección de retorno. */
+.mayor-detail-back i {
+    font-size: 0.76rem;
+    transition: transform 160ms ease;
+}
+
+.mayor-detail-back:hover i {
+    transform: translateX(-2px);
+}
+
+/* Evita que la animación moleste a usuarios con movimiento reducido. */
+@media (prefers-reduced-motion: reduce) {
+    .mayor-detail-back,
+    .mayor-detail-back i {
+        transition: none;
+    }
+}
+
+
+
+/* ==========================================================
+   ENCABEZADO DEL DETALLE
+   ========================================================== */
+
+.mayor-detail-hero {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 245px;
+    margin-bottom: 1.5rem;
+    padding: 2.4rem;
+    overflow: hidden;
+    border-radius: 26px;
+    background:
+        radial-gradient(
+            circle at 78% 20%,
+            rgba(196, 181, 253, 0.28),
+            transparent 27%
+        ),
+        linear-gradient(135deg, #24104f 0%, #4c1d95 55%, #6d28d9 100%);
+    box-shadow: 0 22px 45px rgba(76, 29, 149, 0.22);
+    color: #ffffff;
+}
+
+/* Textura decorativa sutil detrás del contenido. */
+.mayor-detail-hero::before {
+    position: absolute;
+    top: -130px;
+    right: -100px;
+    width: 340px;
+    height: 340px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 50%;
+    content: "";
+}
+
+/* Segundo círculo decorativo del encabezado. */
+.mayor-detail-hero::after {
+    position: absolute;
+    right: 90px;
+    bottom: -175px;
+    width: 310px;
+    height: 310px;
+    border: 55px solid rgba(255, 255, 255, 0.04);
+    border-radius: 50%;
+    content: "";
+}
+
+/* Mantiene el contenido delante de los elementos decorativos. */
+.mayor-detail-hero__content {
+    position: relative;
+    z-index: 2;
+    max-width: 720px;
+}
+
+.mayor-detail-hero h1 {
+    display: flex;
+    flex-direction: column;
+    margin: 0.35rem 0 0.8rem;
+    color: #ffffff;
+    font-size: clamp(2rem, 4vw, 3.5rem);
+    font-weight: 900;
+    letter-spacing: -0.045em;
+    line-height: 1;
+}
+
+/* El nombre de la cuenta recibe menor peso visual que su código. */
+.mayor-detail-hero h1 span {
+    margin-top: 0.35rem;
+    color: #ddd6fe;
+    font-size: clamp(1.1rem, 2.2vw, 1.75rem);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+}
+
+.mayor-detail-hero p {
+    max-width: 610px;
+    margin: 0;
+    color: rgba(255, 255, 255, 0.76);
+    font-size: 1rem;
+    line-height: 1.65;
+}
+
+/* Agrupa los estados y la naturaleza de la cuenta. */
+.mayor-detail-hero__badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.7rem;
+    margin-top: 1.4rem;
+}
+
+/* Ajuste de los distintivos dentro de un fondo oscuro. */
+.mayor-detail-hero__badges .mayor-status,
+.mayor-detail-hero__badges .mayor-period {
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    box-shadow: none;
+}
+
+/* Distintivo informativo de la naturaleza contable. */
+.mayor-detail-nature {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.45rem 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.78);
+    font-size: 0.76rem;
+    backdrop-filter: blur(8px);
+}
+
+.mayor-detail-nature strong {
+    color: #ffffff;
+}
+
+/*
+ * Símbolo decorativo que representa la división tradicional
+ * entre el Debe y el Haber.
+ */
+.mayor-detail-symbol {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 250px;
+    min-width: 250px;
+    margin-left: 2rem;
+    padding-top: 1rem;
+    color: #ffffff;
+    text-align: center;
+}
+
+/* Línea horizontal superior de la Cuenta T. */
+.mayor-detail-symbol::before {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    height: 3px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.9);
+    content: "";
+}
+
+/* Línea vertical divisoria de la Cuenta T. */
+.mayor-detail-symbol::after {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 3px;
+    height: 115px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.9);
+    content: "";
+}
+
+.mayor-detail-symbol span {
+    padding: 1.15rem 0.6rem;
+    font-size: 0.92rem;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+}
+
+
+/* ==========================================================
+   METADATOS DEL SALDO
+   ========================================================== */
+
+.mayor-detail-metadata {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.mayor-detail-metadata article {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    min-width: 0;
+    padding: 1rem;
+    border: 1px solid #e8e5f0;
+    border-radius: 17px;
+    background: #ffffff;
+    box-shadow: 0 8px 20px rgba(44, 31, 73, 0.05);
+}
+
+/* Contenedor visual del ícono de cada dato. */
+.mayor-detail-metadata article > i {
+    display: grid;
+    flex: 0 0 42px;
+    width: 42px;
+    height: 42px;
+    place-items: center;
+    border-radius: 13px;
+    background: #f5f3ff;
+    color: #7c3aed;
+}
+
+.mayor-detail-metadata article div {
+    min-width: 0;
+}
+
+.mayor-detail-metadata span {
+    display: block;
+    margin-bottom: 0.2rem;
+    color: #8a8494;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.035em;
+    text-transform: uppercase;
+}
+
+.mayor-detail-metadata strong {
+    display: block;
+    overflow: hidden;
+    color: #2d2538;
+    font-size: 0.9rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+
+/* ==========================================================
+   TARJETAS DE TOTALES
+   ========================================================== */
+
+.mayor-detail-totals {
+    margin-bottom: 0.5rem;
+}
+
+.mayor-detail-totals > div {
+    margin-bottom: 1rem;
+}
+
+.mayor-total-card {
+    position: relative;
+    height: 100%;
+    min-height: 150px;
+    padding: 1.2rem 1.25rem;
+    overflow: hidden;
+    border: 1px solid #e7e4ed;
+    border-radius: 19px;
+    background: #ffffff;
+    box-shadow: 0 10px 25px rgba(44, 31, 73, 0.055);
+}
+
+/* Línea decorativa que identifica el tipo de total. */
+.mayor-total-card::before {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    height: 4px;
+    background: var(--mayor-total-accent, #7c3aed);
+    content: "";
+}
+
+.mayor-total-card > span {
+    display: block;
+    margin-bottom: 0.55rem;
+    color: #7c7486;
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.mayor-total-card strong {
+    display: block;
+    color: #282131;
+    font-size: clamp(1.25rem, 2vw, 1.7rem);
+    font-weight: 900;
+    letter-spacing: -0.03em;
+}
+
+.mayor-total-card small {
+    display: block;
+    margin-top: 0.75rem;
+    color: #948d9c;
+    font-size: 0.78rem;
+}
+
+/* Colores semánticos de las tarjetas monetarias. */
+.mayor-total-card--initial {
+    --mayor-total-accent: #64748b;
+}
+
+.mayor-total-card--debit {
+    --mayor-total-accent: #2563eb;
+}
+
+.mayor-total-card--credit {
+    --mayor-total-accent: #d97706;
+}
+
+.mayor-total-card--final {
+    --mayor-total-accent: #7c3aed;
+
+    border-color: #ddd6fe;
+    background:
+        linear-gradient(
+            145deg,
+            #ffffff 0%,
+            #faf8ff 100%
+        );
+}
+
+
+/* ==========================================================
+   HOJA PRINCIPAL DE LA CUENTA T
+   ========================================================== */
+
+.mayor-account-sheet {
+    margin-top: 0.5rem;
+    overflow: hidden;
+    border: 1px solid #e5e1eb;
+    border-radius: 24px;
+    background: #ffffff;
+    box-shadow: 0 18px 40px rgba(44, 31, 73, 0.075);
+}
+
+.mayor-account-sheet__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.4rem 1.6rem;
+    border-bottom: 1px solid #eeeaf3;
+}
+
+.mayor-account-sheet__header h2 {
+    margin: 0.15rem 0 0;
+    color: #2c2435;
+    font-size: 1.35rem;
+    font-weight: 900;
+}
+
+/* Cantidad total de movimientos asociados al saldo. */
+.mayor-account-sheet__count {
+    padding: 0.48rem 0.8rem;
+    border-radius: 999px;
+    background: #f1edfa;
+    color: #6d28d9;
+    font-size: 0.77rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+/*
+ * Encabezado gráfico de la Cuenta T.
+ * Las tres columnas representan Debe, cuenta y Haber.
+ */
+.mayor-account-sheet__title {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.15rem 1.5rem;
+    background: #33204f;
+    color: #ffffff;
+    text-align: center;
+}
+
+.mayor-account-sheet__title::after {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 1px;
+    background: rgba(255, 255, 255, 0.18);
+    content: "";
+}
+
+.mayor-account-sheet__title span {
+    font-size: 0.83rem;
+    font-weight: 900;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.mayor-account-sheet__title strong {
+    position: relative;
+    z-index: 1;
+    padding: 0.4rem 0.8rem;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 999px;
+    background: #33204f;
+    color: #ddd6fe;
+    font-size: 0.78rem;
+}
+
+
+/* ==========================================================
+   TABLA DE MOVIMIENTOS
+   ========================================================== */
+
+.mayor-account-table {
+    min-width: 980px;
+    margin-bottom: 0;
+}
+
+.mayor-account-table thead th {
+    padding: 0.9rem 1rem;
+    border-top: 0;
+    border-bottom: 1px solid #e8e3ed;
+    background: #faf9fc;
+    color: #6f6878;
+    font-size: 0.7rem;
+    font-weight: 900;
+    letter-spacing: 0.035em;
+    text-transform: uppercase;
+    vertical-align: middle;
+}
+
+.mayor-account-table tbody td {
+    padding: 1rem;
+    border-top: 1px solid #f0edf3;
+    color: #4a4351;
+    vertical-align: middle;
+}
+
+/* Resalta suavemente la fila sobre la que se encuentra el cursor. */
+.mayor-account-table tbody tr:hover td {
+    background: #fcfbfe;
+}
+
+/* Línea central que separa contablemente el Debe del Haber. */
+.mayor-account-table__divider {
+    border-left: 3px solid #5b347d !important;
+}
+
+.mayor-movement-description {
+    min-width: 210px;
+}
+
+.mayor-movement-description span {
+    display: block;
+    margin-bottom: 0.2rem;
+    color: #948d9c;
+    font-size: 0.73rem;
+}
+
+.mayor-movement-description strong {
+    display: block;
+    color: #403747;
+    font-size: 0.86rem;
+    font-weight: 700;
+    line-height: 1.45;
+}
+
+/* Color diferenciado para importes del Debe. */
+.mayor-money--debit {
+    color: #1d4ed8 !important;
+    font-weight: 800;
+}
+
+/* Color diferenciado para importes del Haber. */
+.mayor-money--credit {
+    color: #b45309 !important;
+    font-weight: 800;
+}
+
+.mayor-account-table tfoot th {
+    padding: 1rem;
+    border-top: 2px solid #ddd6e5;
+    background: #f7f4fa;
+    color: #342a3d;
+    font-size: 0.85rem;
+    font-weight: 900;
+}
+
+
+/* ==========================================================
+   ESTADO VACÍO DE MOVIMIENTOS
+   ========================================================== */
+
+.mayor-account-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 270px;
+    padding: 2rem;
+    color: #88818f;
+    text-align: center;
+}
+
+.mayor-account-empty i {
+    display: grid;
+    width: 64px;
+    height: 64px;
+    margin-bottom: 1rem;
+    place-items: center;
+    border-radius: 20px;
+    background: #f2eef7;
+    color: #7c3aed;
+    font-size: 1.45rem;
+}
+
+.mayor-account-empty strong {
+    margin-bottom: 0.35rem;
+    color: #3b3243;
+    font-size: 1rem;
+}
+
+.mayor-account-empty span {
+    max-width: 500px;
+    font-size: 0.85rem;
+    line-height: 1.55;
+}
+
+
+/* ==========================================================
+   RESULTADO FINAL DE LA MAYORIZACIÓN
+   ========================================================== */
+
+.mayor-balance-result {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 1.2rem;
+    padding: 1.25rem 1.5rem;
+    border-top: 1px solid #e8e3ed;
+    background:
+        linear-gradient(
+            90deg,
+            #faf9fc 0%,
+            #f5f0fb 100%
+        );
+}
+
+.mayor-balance-result > div {
+    min-width: 145px;
+}
+
+.mayor-balance-result span {
+    display: block;
+    margin-bottom: 0.25rem;
+    color: #867e8e;
+    font-size: 0.69rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.mayor-balance-result strong {
+    color: #352c3e;
+    font-size: 1rem;
+    font-weight: 900;
+}
+
+.mayor-balance-result > i {
+    color: #9b91a5;
+    font-size: 0.75rem;
+}
+
+/* El saldo final recibe mayor importancia visual. */
+.mayor-balance-result__final {
+    padding: 0.85rem 1rem;
+    border-radius: 15px;
+    background: #4c1d95;
+    box-shadow: 0 8px 18px rgba(76, 29, 149, 0.18);
+}
+
+.mayor-balance-result__final span {
+    color: #c4b5fd;
+}
+
+.mayor-balance-result__final strong {
+    color: #ffffff;
+    font-size: 1.15rem;
+}
+
+
+/* ==========================================================
+   NOTA DE AUDITORÍA
+   ========================================================== */
+
+.mayor-audit-note {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+    margin-top: 1.25rem;
+    padding: 1rem 1.15rem;
+    border: 1px solid #dbeafe;
+    border-radius: 16px;
+    background: #eff6ff;
+    color: #1e3a5f;
+}
+
+.mayor-audit-note > i {
+    margin-top: 0.15rem;
+    color: #2563eb;
+}
+
+.mayor-audit-note strong,
+.mayor-audit-note span {
+    display: block;
+}
+
+.mayor-audit-note strong {
+    margin-bottom: 0.2rem;
+    font-size: 0.85rem;
+}
+
+.mayor-audit-note span {
+    color: #536b86;
+    font-size: 0.8rem;
+    line-height: 1.5;
+}
+
+
+/* ==========================================================
+   DISEÑO RESPONSIVE
+   ========================================================== */
+
+/* Reorganiza los metadatos en pantallas medianas. */
+@media (max-width: 1199.98px) {
+    .mayor-detail-metadata {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* Oculta el símbolo decorativo cuando resta espacio al contenido. */
+@media (max-width: 991.98px) {
+    .mayor-detail-symbol {
+        display: none;
+    }
+
+    .mayor-detail-hero__content {
+        max-width: 100%;
+    }
+
+    .mayor-balance-result {
+        justify-content: center;
+    }
+}
+
+/* Adapta la composición para teléfonos y tabletas pequeñas. */
+@media (max-width: 767.98px) {
+    .mayor-detail-hero {
+        min-height: auto;
+        padding: 1.6rem 1.25rem;
+        border-radius: 20px;
+    }
+
+    .mayor-detail-hero h1 {
+        font-size: 2rem;
+    }
+
+    .mayor-detail-metadata {
+        grid-template-columns: 1fr;
+    }
+
+    .mayor-account-sheet__header {
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 1.2rem;
+    }
+
+    .mayor-account-sheet__title {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    /*
+     * En móvil se oculta el código central porque Debe y Haber
+     * necesitan conservar suficiente espacio horizontal.
+     */
+    .mayor-account-sheet__title strong {
+        display: none;
+    }
+
+    .mayor-balance-result {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 0.7rem;
+    }
+
+    .mayor-balance-result > i {
+        align-self: center;
+        transform: rotate(90deg);
+    }
+
+    .mayor-balance-result > div {
+        min-width: 0;
+        text-align: center;
+    }
+}
+
+/* Ajustes finales para teléfonos angostos. */
+@media (max-width: 575.98px) {
+    .mayor-detail-nav {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .mayor-detail-hero__badges {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .mayor-detail-hero__badges > span {
+        width: fit-content;
+    }
+
+    .mayor-total-card {
+        min-height: 130px;
+    }
+
+    .mayor-account-sheet {
+        border-radius: 18px;
+    }
+}

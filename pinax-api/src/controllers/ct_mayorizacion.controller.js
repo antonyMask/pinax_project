@@ -8,7 +8,7 @@ const { pool } = require('../config/db');
     - centralizan los estados permitidos para los saldos de mayorizacion.
     - se usan en GET, POST y PUT.
 */
-const ESTADOS_SALDO = ['abierto', 'recalculando', 'cerrado','inactivo'];
+const ESTADOS_SALDO = ['abierto', 'recalculado', 'cerrado','inactivo'];
 const VISTAS_MAYORIZACION = ['resumen', 'cuenta_t', 'opciones'];
 const ACCIONES_MAYORIZACION = ['recalcular', 'cerrar', 'inactivar'];
 

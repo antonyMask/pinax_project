@@ -297,11 +297,9 @@ return [
             'label_color' => 'info',
         ],
         [
-            'text' => 'Mayorización',
-            'url' => '#',
+            'text' => 'CT & Mayorización',
+            'route' => 'mayorizacion.index',
             'icon' => 'fas fa-fw fa-balance-scale',
-            'label' => 'Próximo',
-            'label_color' => 'info',
         ],
 
         /*
